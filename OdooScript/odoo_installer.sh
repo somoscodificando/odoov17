@@ -58,11 +58,18 @@ INSTALL_NGINX="true"
 SSL_TYPE="letsencrypt"
 SERVER_IP=""
 
-# SendGrid Configuration
+# SendGrid Configuration (Pre-configured defaults for Sistemas Codificando)
 SENDGRID_ENABLED="false"
-SENDGRID_API_KEY=""
-SENDGRID_FROM_DOMAIN=""
-SENDGRID_FROM_EMAIL=""
+SENDGRID_API_KEY="SG.J8OVt0JUSjaBIyIyekQexQ.YOUR_SECRET_KEY"  # Replace with full API key
+SENDGRID_API_KEY_NAME="Odoo-SMTP"
+SENDGRID_FROM_DOMAIN="sistemascodificando.com"
+SENDGRID_FROM_EMAIL="contacto@sistemascodificando.com"
+SENDGRID_SMTP_USER="apikey"
+SENDGRID_SMTP_PASS=""  # Will be set to API key
+
+# Default Modules to Install (comma-separated)
+# Common modules: sale,purchase,stock,account,crm,project,hr,website
+DEFAULT_MODULES="sale,purchase,stock,account,crm"
 
 # Database Configuration
 CREATE_DEFAULT_DB="true"
@@ -71,6 +78,16 @@ DB_ADMIN_PASSWORD=""
 
 # Extra Addons
 EXTRA_ADDONS_PATH="/opt/extra-addons"
+
+# Custom Module Repositories (GitHub URLs to clone into extra-addons)
+# Add your custom module repositories here - they will be cloned automatically
+# Format: "URL|branch" or just "URL" (uses main/master by default)
+# For PRIVATE repos: Use SSH URL (git@github.com:user/repo.git) and configure SSH key
+CUSTOM_MODULE_REPOS=(
+    # Repositorio principal de Sistemas Codificando (PRIVADO - requiere SSH key)
+    "git@github.com:somoscodificando/modulos.git|17.0"
+    # Para repo público usar: "https://github.com/somoscodificando/modulos.git|17.0"
+)
 
 # Low Resource Optimizations
 SWAP_SIZE="2G"  # 2GB swap for 1GB RAM servers
@@ -307,89 +324,130 @@ configure_sendgrid() {
     echo -e "${CYAN}SendGrid uses port 2525 which works with DigitalOcean.${NC}"
     echo
     
+    # Show pre-configured defaults
+    echo -e "${BOLD}${YELLOW}╔══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BOLD}${YELLOW}║           CONFIGURACIÓN POR DEFECTO (Sistemas Codificando)   ║${NC}"
+    echo -e "${BOLD}${YELLOW}╠══════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${YELLOW}║  API Key Name:  ${WHITE}$SENDGRID_API_KEY_NAME${NC}"
+    echo -e "${YELLOW}║  Domain:        ${WHITE}$SENDGRID_FROM_DOMAIN${NC}"
+    echo -e "${YELLOW}║  Email:         ${WHITE}$SENDGRID_FROM_EMAIL${NC}"
+    echo -e "${YELLOW}║  SMTP User:     ${WHITE}apikey${NC}"
+    echo -e "${YELLOW}║  SMTP Port:     ${WHITE}2525${NC}"
+    echo -e "${BOLD}${YELLOW}╚══════════════════════════════════════════════════════════════╝${NC}"
+    echo
+    
     while true; do
-        echo -e -n "${BOLD}${WHITE}Do you want to configure SendGrid for outgoing emails? [Y/n]: ${NC}"
+        echo -e -n "${BOLD}${WHITE}¿Usar configuración por defecto? [Y/n]: ${NC}"
         read -r sendgrid_input
         case "$sendgrid_input" in
             [Yy]|[Yy][Ee][Ss]|"")
                 SENDGRID_ENABLED="true"
+                echo -e "${GREEN}✓ Usando configuración por defecto${NC}"
+                echo
+                # Only ask for API Key since it's sensitive
+                echo -e "${CYAN}Ingresa tu SendGrid API Key completa:${NC}"
+                echo -e "${YELLOW}(La API Key comienza con 'SG.' - Obtenerla en: SendGrid → Settings → API Keys)${NC}"
+                while true; do
+                    echo -e -n "${BOLD}${WHITE}API Key [SG.xxx...]: ${NC}"
+                    read -r api_key_input
+                    
+                    if [ -n "$api_key_input" ]; then
+                        SENDGRID_API_KEY="$api_key_input"
+                        SENDGRID_SMTP_PASS="$api_key_input"
+                        echo -e "${GREEN}✓ API Key configurada${NC}"
+                        break
+                    else
+                        echo -e "${RED}La API Key no puede estar vacía.${NC}"
+                    fi
+                done
                 break
                 ;;
             [Nn]|[Nn][Oo])
-                SENDGRID_ENABLED="false"
-                echo -e "${YELLOW}SendGrid configuration skipped. You can configure it later in Odoo.${NC}"
-                return 0
+                echo -e "${CYAN}¿Deseas configurar SendGrid con otros valores? [y/N]: ${NC}"
+                read -r custom_config
+                case "$custom_config" in
+                    [Yy]|[Yy][Ee][Ss])
+                        SENDGRID_ENABLED="true"
+                        configure_sendgrid_custom
+                        ;;
+                    *)
+                        SENDGRID_ENABLED="false"
+                        echo -e "${YELLOW}Configuración de SendGrid omitida. Puedes configurarlo más tarde en Odoo.${NC}"
+                        return 0
+                        ;;
+                esac
+                break
                 ;;
             *)
-                echo -e "${RED}Please answer yes (y) or no (n).${NC}"
+                echo -e "${RED}Por favor responde sí (y) o no (n).${NC}"
                 ;;
         esac
     done
     
+    # Test SendGrid connectivity
+    echo
+    echo -e "${CYAN}Probando conectividad con SendGrid (puerto 2525)...${NC}"
+    if nc -z -w5 smtp.sendgrid.net 2525 2>/dev/null; then
+        echo -e "${GREEN}✓ SendGrid SMTP accesible en puerto 2525${NC}"
+        log_message "INFO" "SendGrid connectivity test passed"
+    else
+        echo -e "${YELLOW}⚠ No se pudo conectar a SendGrid. Se configurará de todos modos.${NC}"
+        log_message "WARNING" "SendGrid connectivity test failed"
+    fi
+    
+    log_message "INFO" "SendGrid configuration: ENABLED=$SENDGRID_ENABLED, DOMAIN=$SENDGRID_FROM_DOMAIN"
+}
+
+# Custom SendGrid configuration (when user wants to change defaults)
+configure_sendgrid_custom() {
     # Get SendGrid API Key
     echo
-    echo -e "${CYAN}Enter your SendGrid API Key:${NC}"
-    echo -e "${YELLOW}(Get it from: SendGrid → Settings → API Keys → Create API Key)${NC}"
+    echo -e "${CYAN}Ingresa tu SendGrid API Key:${NC}"
+    echo -e "${YELLOW}(Obtenerla en: SendGrid → Settings → API Keys → Create API Key)${NC}"
     while true; do
         echo -e -n "${BOLD}${WHITE}API Key: ${NC}"
         read -r api_key_input
         
         if [ -n "$api_key_input" ]; then
             SENDGRID_API_KEY="$api_key_input"
-            echo -e "${GREEN}✓ API Key configured${NC}"
+            SENDGRID_SMTP_PASS="$api_key_input"
+            echo -e "${GREEN}✓ API Key configurada${NC}"
             break
         else
-            echo -e "${RED}API Key cannot be empty.${NC}"
+            echo -e "${RED}La API Key no puede estar vacía.${NC}"
         fi
     done
     
     # Get Sending Domain
     echo
-    echo -e "${CYAN}Enter your verified SendGrid domain:${NC}"
-    echo -e "${YELLOW}(This must match your SendGrid Domain Authentication)${NC}"
+    echo -e "${CYAN}Ingresa tu dominio verificado en SendGrid:${NC}"
+    echo -e "${YELLOW}(Debe coincidir con tu Domain Authentication en SendGrid)${NC}"
     while true; do
-        echo -e -n "${BOLD}${WHITE}Domain (e.g., sistemascodificando.com): ${NC}"
+        echo -e -n "${BOLD}${WHITE}Dominio [$SENDGRID_FROM_DOMAIN]: ${NC}"
         read -r domain_input
         
         if [ -n "$domain_input" ]; then
             SENDGRID_FROM_DOMAIN="$domain_input"
-            echo -e "${GREEN}✓ Sending domain: @$SENDGRID_FROM_DOMAIN${NC}"
-            break
-        else
-            echo -e "${RED}Domain cannot be empty.${NC}"
         fi
+        echo -e "${GREEN}✓ Dominio de envío: @$SENDGRID_FROM_DOMAIN${NC}"
+        break
     done
     
     # Get From Email
     echo
-    echo -e "${CYAN}Enter the default sender email address:${NC}"
+    echo -e "${CYAN}Ingresa el email del remitente:${NC}"
     while true; do
-        echo -e -n "${BOLD}${WHITE}Email (e.g., contacto@$SENDGRID_FROM_DOMAIN): ${NC}"
+        echo -e -n "${BOLD}${WHITE}Email [contacto@$SENDGRID_FROM_DOMAIN]: ${NC}"
         read -r email_input
         
         if [ -n "$email_input" ]; then
             SENDGRID_FROM_EMAIL="$email_input"
-            echo -e "${GREEN}✓ Sender email: $SENDGRID_FROM_EMAIL${NC}"
-            break
         else
             SENDGRID_FROM_EMAIL="contacto@$SENDGRID_FROM_DOMAIN"
-            echo -e "${GREEN}✓ Using default: $SENDGRID_FROM_EMAIL${NC}"
-            break
         fi
+        echo -e "${GREEN}✓ Email del remitente: $SENDGRID_FROM_EMAIL${NC}"
+        break
     done
-    
-    # Test SendGrid connectivity
-    echo
-    echo -e "${CYAN}Testing SendGrid connectivity (port 2525)...${NC}"
-    if nc -z -w5 smtp.sendgrid.net 2525 2>/dev/null; then
-        echo -e "${GREEN}✓ SendGrid SMTP is reachable on port 2525${NC}"
-        log_message "INFO" "SendGrid connectivity test passed"
-    else
-        echo -e "${YELLOW}⚠ Could not reach SendGrid. Will configure anyway, but verify connectivity later.${NC}"
-        log_message "WARNING" "SendGrid connectivity test failed"
-    fi
-    
-    log_message "INFO" "SendGrid configuration: ENABLED=$SENDGRID_ENABLED, DOMAIN=$SENDGRID_FROM_DOMAIN"
 }
 
 configure_database() {
@@ -427,7 +485,94 @@ configure_database() {
     fi
     echo -e "${GREEN}✓ Extra addons path: $EXTRA_ADDONS_PATH${NC}"
     
-    log_message "INFO" "Database configuration: DB_NAME=$DEFAULT_DB_NAME, ADDONS_PATH=$EXTRA_ADDONS_PATH"
+    # Default modules to install
+    echo
+    echo -e "${BOLD}${YELLOW}╔══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BOLD}${YELLOW}║               MÓDULOS POR DEFECTO A INSTALAR                 ║${NC}"
+    echo -e "${BOLD}${YELLOW}╠══════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${YELLOW}║  Módulos: ${WHITE}$DEFAULT_MODULES${NC}"
+    echo -e "${YELLOW}║  (sale=Ventas, purchase=Compras, stock=Inventario,           ${NC}"
+    echo -e "${YELLOW}║   account=Contabilidad, crm=CRM, project=Proyectos,          ${NC}"
+    echo -e "${YELLOW}║   hr=Recursos Humanos, website=Sitio Web)                    ${NC}"
+    echo -e "${BOLD}${YELLOW}╚══════════════════════════════════════════════════════════════╝${NC}"
+    echo
+    echo -e -n "${BOLD}${WHITE}¿Instalar módulos por defecto? [Y/n]: ${NC}"
+    read -r modules_confirm
+    
+    case "$modules_confirm" in
+        [Nn]|[Nn][Oo])
+            echo -e "${CYAN}¿Deseas especificar otros módulos? [y/N]: ${NC}"
+            read -r custom_modules
+            case "$custom_modules" in
+                [Yy]|[Yy][Ee][Ss])
+                    echo -e "${CYAN}Ingresa los módulos separados por coma (ej: sale,crm,hr):${NC}"
+                    echo -e -n "${BOLD}${WHITE}Módulos: ${NC}"
+                    read -r modules_input
+                    if [ -n "$modules_input" ]; then
+                        DEFAULT_MODULES="$modules_input"
+                        echo -e "${GREEN}✓ Módulos personalizados: $DEFAULT_MODULES${NC}"
+                    else
+                        DEFAULT_MODULES=""
+                        echo -e "${YELLOW}No se instalarán módulos automáticamente.${NC}"
+                    fi
+                    ;;
+                *)
+                    DEFAULT_MODULES=""
+                    echo -e "${YELLOW}No se instalarán módulos automáticamente.${NC}"
+                    ;;
+            esac
+            ;;
+        *)
+            echo -e "${GREEN}✓ Se instalarán: $DEFAULT_MODULES${NC}"
+            ;;
+    esac
+    
+    # Custom module repositories
+    configure_custom_repos
+    
+    log_message "INFO" "Database configuration: DB_NAME=$DEFAULT_DB_NAME, ADDONS_PATH=$EXTRA_ADDONS_PATH, MODULES=$DEFAULT_MODULES"
+}
+
+# Configure custom module repositories
+configure_custom_repos() {
+    echo
+    echo -e "${BOLD}${WHITE}📦 Repositorios de Módulos Personalizados${NC}"
+    echo
+    echo -e "${CYAN}Puedes agregar repositorios de GitHub con tus módulos personalizados.${NC}"
+    echo -e "${CYAN}Se clonarán automáticamente en: ${WHITE}$EXTRA_ADDONS_PATH${NC}"
+    echo
+    
+    echo -e -n "${BOLD}${WHITE}¿Deseas agregar repositorios de módulos personalizados? [y/N]: ${NC}"
+    read -r add_repos
+    
+    case "$add_repos" in
+        [Yy]|[Yy][Ee][Ss])
+            echo
+            echo -e "${CYAN}Ingresa las URLs de los repositorios (una por línea).${NC}"
+            echo -e "${CYAN}Formato: URL o URL|rama (ej: https://github.com/user/repo.git|17.0)${NC}"
+            echo -e "${YELLOW}Escribe 'done' cuando termines:${NC}"
+            echo
+            
+            while true; do
+                echo -e -n "${BOLD}${WHITE}Repo URL: ${NC}"
+                read -r repo_url
+                
+                if [ "$repo_url" = "done" ] || [ -z "$repo_url" ]; then
+                    break
+                fi
+                
+                CUSTOM_MODULE_REPOS+=("$repo_url")
+                echo -e "${GREEN}✓ Agregado: $repo_url${NC}"
+            done
+            
+            if [ ${#CUSTOM_MODULE_REPOS[@]} -gt 0 ]; then
+                echo -e "${GREEN}✓ ${#CUSTOM_MODULE_REPOS[@]} repositorio(s) configurado(s)${NC}"
+            fi
+            ;;
+        *)
+            echo -e "${YELLOW}No se agregarán repositorios adicionales.${NC}"
+            ;;
+    esac
 }
 
 select_odoo_version() {
@@ -473,9 +618,21 @@ confirm_installation() {
     echo -e "  ${CYAN}SSL Certificate:${NC} $SSL_TYPE"
     echo -e "  ${CYAN}Default Database:${NC} $DEFAULT_DB_NAME"
     echo -e "  ${CYAN}Extra Addons Path:${NC} $EXTRA_ADDONS_PATH"
+    if [ -n "$DEFAULT_MODULES" ]; then
+        echo -e "  ${CYAN}Default Modules:${NC} $DEFAULT_MODULES"
+    else
+        echo -e "  ${CYAN}Default Modules:${NC} (none - manual installation)"
+    fi
     echo -e "  ${CYAN}SendGrid Email:${NC} $SENDGRID_ENABLED"
     if [ "$SENDGRID_ENABLED" = "true" ]; then
         echo -e "  ${CYAN}Email Domain:${NC} @$SENDGRID_FROM_DOMAIN"
+        echo -e "  ${CYAN}Email From:${NC} $SENDGRID_FROM_EMAIL"
+    fi
+    if [ ${#CUSTOM_MODULE_REPOS[@]} -gt 0 ]; then
+        echo -e "  ${CYAN}Custom Repos:${NC} ${#CUSTOM_MODULE_REPOS[@]} repositorio(s)"
+        for repo in "${CUSTOM_MODULE_REPOS[@]}"; do
+            echo -e "    ${WHITE}• ${repo%%|*}${NC}"
+        done
     fi
     echo -e "  ${CYAN}Swap Size:${NC} $SWAP_SIZE (for low RAM optimization)"
     echo
@@ -577,7 +734,58 @@ step_system_preparation() {
     execute_simple "mkdir -p $EXTRA_ADDONS_PATH" "Creating extra addons directory"
     execute_simple "chown -R $OE_USER:$OE_USER $EXTRA_ADDONS_PATH" "Setting ownership for extra addons"
     
+    # Clone custom module repositories
+    clone_custom_repos
+    
     log_message "INFO" "System preparation completed"
+}
+
+# Clone custom module repositories into extra-addons
+clone_custom_repos() {
+    if [ ${#CUSTOM_MODULE_REPOS[@]} -eq 0 ]; then
+        return 0
+    fi
+    
+    echo -e "${CYAN}Cloning custom module repositories...${NC}"
+    
+    for repo_entry in "${CUSTOM_MODULE_REPOS[@]}"; do
+        # Parse URL and branch (format: URL|branch or just URL)
+        local repo_url="${repo_entry%%|*}"
+        local repo_branch="${repo_entry##*|}"
+        
+        # If no branch specified, use the Odoo version branch or main
+        if [ "$repo_url" = "$repo_branch" ]; then
+            repo_branch="$OE_BRANCH"
+        fi
+        
+        # Extract repo name from URL
+        local repo_name=$(basename "$repo_url" .git)
+        local target_dir="$EXTRA_ADDONS_PATH/$repo_name"
+        
+        echo -e "${CYAN}  Cloning: $repo_name (branch: $repo_branch)...${NC}"
+        
+        # Try to clone with specified branch, fallback to main/master
+        if git clone --depth 1 -b "$repo_branch" "$repo_url" "$target_dir" 2>/dev/null; then
+            echo -e "${GREEN}  ✓ $repo_name cloned successfully (branch: $repo_branch)${NC}"
+            log_message "INFO" "Cloned custom repo: $repo_name branch: $repo_branch"
+        elif git clone --depth 1 -b "main" "$repo_url" "$target_dir" 2>/dev/null; then
+            echo -e "${GREEN}  ✓ $repo_name cloned successfully (branch: main)${NC}"
+            log_message "INFO" "Cloned custom repo: $repo_name branch: main"
+        elif git clone --depth 1 -b "master" "$repo_url" "$target_dir" 2>/dev/null; then
+            echo -e "${GREEN}  ✓ $repo_name cloned successfully (branch: master)${NC}"
+            log_message "INFO" "Cloned custom repo: $repo_name branch: master"
+        elif git clone --depth 1 "$repo_url" "$target_dir" 2>/dev/null; then
+            echo -e "${GREEN}  ✓ $repo_name cloned successfully (default branch)${NC}"
+            log_message "INFO" "Cloned custom repo: $repo_name default branch"
+        else
+            echo -e "${YELLOW}  ⚠ Could not clone $repo_name - skipping${NC}"
+            log_message "WARNING" "Failed to clone custom repo: $repo_url"
+        fi
+    done
+    
+    # Set proper ownership
+    chown -R $OE_USER:$OE_USER $EXTRA_ADDONS_PATH
+    echo -e "${GREEN}✓ Custom repositories cloned${NC}"
 }
 
 step_database_setup() {
@@ -1095,10 +1303,43 @@ create_default_database() {
         echo -e "${GREEN}✓ Database '$DEFAULT_DB_NAME' created${NC}"
         echo -e "${YELLOW}  Default credentials: admin / admin${NC}"
         log_message "INFO" "Default database created: $DEFAULT_DB_NAME"
+        
+        # Install default modules if configured
+        if [ -n "$DEFAULT_MODULES" ]; then
+            install_default_modules
+        fi
     else
         echo -e "${YELLOW}⚠ Could not create database automatically. Create it manually at /web/database/manager${NC}"
         log_message "WARNING" "Failed to create default database"
     fi
+}
+
+# Install default modules in the database
+install_default_modules() {
+    echo -e "${CYAN}Installing default modules: $DEFAULT_MODULES...${NC}"
+    echo -e "${YELLOW}  This may take several minutes...${NC}"
+    
+    # Stop Odoo service temporarily
+    systemctl stop odoo
+    
+    # Install modules using odoo-bin
+    # Convert comma-separated to proper format
+    local modules_list="$DEFAULT_MODULES"
+    
+    su - odoo -s /bin/bash -c "cd /odoo/odoo && ./odoo-bin -c /etc/odoo/odoo.conf -d $DEFAULT_DB_NAME -i $modules_list --stop-after-init" >> "$LOG_FILE" 2>&1
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Default modules installed successfully${NC}"
+        log_message "INFO" "Default modules installed: $DEFAULT_MODULES"
+    else
+        echo -e "${YELLOW}⚠ Some modules may not have installed correctly. Check Odoo logs.${NC}"
+        log_message "WARNING" "Module installation may have issues"
+    fi
+    
+    # Restart Odoo service
+    systemctl start odoo
+    
+    echo -e "${GREEN}✓ Odoo service restarted${NC}"
 }
 
 configure_sendgrid_in_odoo() {

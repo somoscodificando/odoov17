@@ -12,7 +12,7 @@
 
 ```bash
 # Download the installer
-wget https://raw.githubusercontent.com/mah007/OdooScript/refs/heads/16.0/odoo_installer.sh
+wget https://raw.githubusercontent.com/somoscodificando/odoov17/main/OdooScript/odoo_installer.sh
 # Make it executable
 chmod +x odoo_installer.sh
 
@@ -40,7 +40,7 @@ ssh root@TU_IP_DEL_SERVIDOR
 
 ```bash
 # Descargar el instalador
-wget https://raw.githubusercontent.com/mah007/OdooScript/refs/heads/16.0/odoo_installer.sh
+wget https://raw.githubusercontent.com/somoscodificando/odoov17/main/OdooScript/odoo_installer.sh
 
 # Dar permisos de ejecución
 chmod +x odoo_installer.sh
@@ -71,18 +71,56 @@ Enter your domain name: odoo.tuempresa.com
 > Si no tienes dominio, presiona `N` y usará la IP del servidor.
 
 #### 4.3 Configuración de SendGrid (Email)
+
+El script viene con valores **pre-configurados por defecto** para Sistemas Codificando:
+
 ```
-Do you want to configure SendGrid for outgoing emails? [Y/n]: Y
-API Key: SG.xxxxxxxxxxxxxxxxxxxxxxxxxxxx
-Domain: tuempresa.com
-Email: contacto@tuempresa.com
+╔══════════════════════════════════════════════════════════════╗
+║           CONFIGURACIÓN POR DEFECTO (Sistemas Codificando)   ║
+╠══════════════════════════════════════════════════════════════╣
+║  API Key Name:  Odoo-SMTP                                    ║
+║  Domain:        sistemascodificando.com                      ║
+║  Email:         contacto@sistemascodificando.com             ║
+║  SMTP User:     apikey                                       ║
+║  SMTP Port:     2525                                         ║
+╚══════════════════════════════════════════════════════════════╝
+
+¿Usar configuración por defecto? [Y/n]: Y
+✓ Usando configuración por defecto
+
+Ingresa tu SendGrid API Key completa:
+API Key [SG.xxx...]: SG.J8OVt0JUSjaBIyIyekQexQ.xxxxxxxxxxxxxxxx
+✓ API Key configurada
 ```
 
-#### 4.4 Configuración de Base de Datos
+> 💡 Solo necesitas ingresar tu **API Key completa** de SendGrid. Los demás valores ya están configurados.
+
+#### 4.4 Configuración de Base de Datos y Módulos
 ```
 Database name [CODIFICANDO]: CODIFICANDO
 Path [/opt/extra-addons]: /opt/extra-addons
+
+╔══════════════════════════════════════════════════════════════╗
+║               MÓDULOS POR DEFECTO A INSTALAR                 ║
+╠══════════════════════════════════════════════════════════════╣
+║  Módulos: sale,purchase,stock,account,crm                    ║
+╚══════════════════════════════════════════════════════════════╝
+
+¿Instalar módulos por defecto? [Y/n]: Y
+✓ Se instalarán: sale,purchase,stock,account,crm
 ```
+
+**Módulos disponibles por defecto:**
+| Módulo | Descripción |
+|--------|-------------|
+| `sale` | Ventas |
+| `purchase` | Compras |
+| `stock` | Inventario |
+| `account` | Contabilidad |
+| `crm` | CRM (Gestión de clientes) |
+| `project` | Proyectos |
+| `hr` | Recursos Humanos |
+| `website` | Sitio Web |
 
 #### 4.5 Confirmación
 ```
@@ -113,16 +151,27 @@ Una vez completado:
 - **Con dominio**: `https://odoo.tuempresa.com`
 - **Sin dominio**: `http://TU_IP:8069`
 
-**Credenciales iniciales**:
-- Usuario: `admin`
-- Contraseña: `admin` ⚠️ **¡Cambiar inmediatamente!**
+**Credenciales iniciales de Odoo**:
+| Campo | Valor |
+|-------|-------|
+| Usuario | `admin` |
+| Contraseña | `admin` ⚠️ **¡Cambiar inmediatamente!** |
+
+**Credenciales SendGrid (pre-configuradas)**:
+| Campo | Valor |
+|-------|-------|
+| SMTP Server | `smtp.sendgrid.net` |
+| Puerto | `2525` |
+| Usuario SMTP | `apikey` |
+| Contraseña SMTP | Tu API Key de SendGrid |
+| Email remitente | `contacto@sistemascodificando.com` |
 
 ### **Paso 7: Post-Instalación**
 
-1. **Cambiar contraseña de admin**
+1. **Cambiar contraseña de admin** (¡Muy importante!)
 2. **Configurar datos de empresa**
-3. **Verificar envío de emails** (si configuraste SendGrid)
-4. **Instalar módulos necesarios**
+3. **Verificar envío de emails** (ya configurado con SendGrid)
+4. **Los módulos ya están instalados** (sale, purchase, stock, account, crm)
 
 ---
 
@@ -164,12 +213,129 @@ Una vez completado:
 
 ```
 /odoo/odoo/                  # Código fuente de Odoo
-/opt/extra-addons/           # Módulos personalizados (¡TUS MÓDULOS AQUÍ!)
+/opt/extra-addons/           # Módulos personalizados
+  └── modulos/               # Repo somoscodificando/modulos (clonado automáticamente)
+      ├── modulo_ventas/
+      ├── modulo_inventario/
+      └── ...
 /etc/odoo/odoo.conf          # Configuración de Odoo
 /var/log/odoo/               # Logs de Odoo
 /var/lib/odoo/               # Datos de Odoo
 /root/.odoo_credentials      # Credenciales (SEGURO)
 /root/odoo_installation_report.txt  # Reporte de instalación
+```
+
+---
+
+## 📦 Agregar Módulos Personalizados
+
+### **Opción 1: Durante la Instalación (Recomendado)**
+
+El script te preguntará si deseas agregar repositorios de módulos personalizados:
+
+```
+¿Deseas agregar repositorios de módulos personalizados? [y/N]: y
+
+Ingresa las URLs de los repositorios (una por línea).
+Formato: URL o URL|rama (ej: https://github.com/user/repo.git|17.0)
+Escribe 'done' cuando termines:
+
+Repo URL: https://github.com/somoscodificando/odoo-modulos-custom.git|17.0
+✓ Agregado: https://github.com/somoscodificando/odoo-modulos-custom.git|17.0
+
+Repo URL: https://github.com/OCA/web.git|17.0
+✓ Agregado: https://github.com/OCA/web.git|17.0
+
+Repo URL: done
+✓ 2 repositorio(s) configurado(s)
+```
+
+Los repositorios se clonarán automáticamente en `/opt/extra-addons/`.
+
+### **Opción 2: Pre-configurar en el Script (Por defecto)**
+
+El script ya incluye el repositorio de Sistemas Codificando:
+
+```bash
+# Custom Module Repositories (línea ~82)
+CUSTOM_MODULE_REPOS=(
+    # Repositorio principal de Sistemas Codificando (PRIVADO)
+    "git@github.com:somoscodificando/modulos.git|17.0"
+)
+```
+
+### **⚠️ Repositorios Privados - Configurar SSH Key**
+
+Si tu repositorio es **privado**, necesitas configurar una SSH key en el servidor **ANTES** de ejecutar el instalador:
+
+```bash
+# 1. Conectar al servidor
+ssh root@TU_IP_DEL_SERVIDOR
+
+# 2. Generar SSH key
+ssh-keygen -t ed25519 -C "servidor-odoo"
+# Presiona Enter en todas las preguntas (sin passphrase)
+
+# 3. Ver la clave pública
+cat ~/.ssh/id_ed25519.pub
+# Copiar todo el contenido que aparece
+
+# 4. Agregar la clave a GitHub
+# Ve a: https://github.com/settings/keys
+# Click "New SSH key"
+# Título: "Servidor Odoo - TU_DOMINIO"
+# Key: Pegar la clave copiada
+# Click "Add SSH key"
+
+# 5. Probar conexión
+ssh -T git@github.com
+# Debe responder: "Hi somoscodificando! You've successfully authenticated..."
+
+# 6. Ahora ejecutar el instalador
+wget https://raw.githubusercontent.com/somoscodificando/odoov17/main/OdooScript/odoo_installer.sh
+chmod +x odoo_installer.sh
+sudo ./odoo_installer.sh
+```
+
+> 💡 **Tip**: Para repositorios **públicos**, usa URL HTTPS:
+> `"https://github.com/somoscodificando/modulos.git|17.0"`
+
+### **Opción 3: Después de la Instalación**
+
+```bash
+# Clonar manualmente (privado con SSH)
+cd /opt/extra-addons
+git clone -b 17.0 git@github.com:somoscodificando/modulos.git
+
+# O público con HTTPS
+git clone -b 17.0 https://github.com/somoscodificando/modulos.git
+
+# Cambiar permisos
+chown -R odoo:odoo /opt/extra-addons
+
+# Reiniciar Odoo
+systemctl restart odoo
+
+# En Odoo: Apps → Actualizar lista de aplicaciones → Buscar e instalar
+```
+
+### **Estructura de un Módulo Personalizado**
+
+```
+/opt/extra-addons/
+└── mi_modulo/
+    ├── __init__.py
+    ├── __manifest__.py
+    ├── models/
+    │   ├── __init__.py
+    │   └── mi_modelo.py
+    ├── views/
+    │   └── mi_vista.xml
+    ├── security/
+    │   └── ir.model.access.csv
+    └── static/
+        └── description/
+            └── icon.png
 ```
 
 ---
@@ -764,8 +930,8 @@ We welcome contributions to improve the Enhanced Odoo Installer! Here's how you 
 ### **Development Setup**
 ```bash
 # Clone the repository
-git clone https://github.com/mah007/OdooScript.git
-cd OdooScript
+git clone https://github.com/somoscodificando/odoov17.git
+cd odoov17/OdooScript
 
 # Create a feature branch
 git checkout -b feature/your-feature-name
@@ -806,9 +972,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **Documentation**: [GitHub Wiki](https://github.com/mah007/OdooScript/wiki)
-- **Issues**: [GitHub Issues](https://github.com/mah007/OdooScript/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/mah007/OdooScript/discussions)
+- **Documentation**: [GitHub Wiki](https://github.com/somoscodificando/odoov17/wiki)
+- **Issues**: [GitHub Issues](https://github.com/somoscodificando/odoov17/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/somoscodificando/odoov17/discussions)
 
 ---
 
@@ -817,7 +983,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **Made with ❤️ for the Odoo community By Mahmoud Abdel Latif**
 
 
-[Website](https://mah007.net) • [Documentation](https://github.com/mah007/OdooScript/wiki) • [Issues](https://github.com/mah007/OdooScript/issues)
+[Documentation](https://github.com/somoscodificando/odoov17/wiki) • [Issues](https://github.com/somoscodificando/odoov17/issues)
 
 </div>
 
@@ -853,7 +1019,7 @@ apt-get install python-certbot-apache <br />
 sudo certbot --apache <br />
 #######################################################################<br />
 
-wget https://raw.githubusercontent.com/mah007/OdooScript/12.0/nginx.sh <br />
+wget https://raw.githubusercontent.com/somoscodificando/odoov17/main/OdooScript/src/nginx.sh <br />
 bash nginx.sh <br />
 
  apt-get update <br />
@@ -878,7 +1044,7 @@ sudo apt-get update <br />
 ########################################################################<br />
 
 sudo su - postgres -c "createuser -s odoo" 2> /dev/null || true <br />
-wget https://raw.githubusercontent.com/mah007/OdooScript/master/odoo_pro.sh <br />
+wget https://raw.githubusercontent.com/somoscodificando/odoov17/main/OdooScript/odoo_installer.sh <br />
 sudo /bin/sh odoo_pro.sh <br />
 
 #

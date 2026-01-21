@@ -12,7 +12,7 @@
 
 ```bash
 # Download the installer
-wget https://raw.githubusercontent.com/mah007/OdooScript/refs/heads/16.0/odoo_installer.sh
+wget https://raw.githubusercontent.com/somoscodificando/odoov17/main/OdooScript/odoo_installer.sh
 # Make it executable
 chmod +x odoo_installer.sh
 
@@ -533,8 +533,8 @@ We welcome contributions to improve the Enhanced Odoo Installer! Here's how you 
 ### **Development Setup**
 ```bash
 # Clone the repository
-git clone https://github.com/mah007/OdooScript.git
-cd OdooScript
+git clone https://github.com/somoscodificando/odoov17.git
+cd odoov17/OdooScript
 
 # Create a feature branch
 git checkout -b feature/your-feature-name
@@ -586,7 +586,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **Made with ❤️ for the Odoo community By Mahmoud Abdel Latif**
 
 
-[Website](https://mah007.net) • [Documentation](https://github.com/mah007/OdooScript/wiki) • [Issues](https://github.com/mah007/OdooScript/issues)
+[Documentation](https://github.com/somoscodificando/odoov17/wiki) • [Issues](https://github.com/somoscodificando/odoov17/issues)
 
 </div>
 
