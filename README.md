@@ -160,7 +160,7 @@ sudo -E ./odoo_installer.sh
 **Opción B: Editar el script directamente**
 ```bash
 # Busca esta línea en el script y agrega tu key:
-SENDGRID_API_KEY="${SENDGRID_API_KEY:-}" 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 # <-- AGREGAR TU API KEY AQUÍ
+SENDGRID_API_KEY="${SENDGRID_API_KEY:-}" # <-- AGREGAR TU API KEY AQUÍ
 ```
 
 #### 4.4 Configuración de Base de Datos y Módulos
