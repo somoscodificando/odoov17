@@ -74,58 +74,53 @@ sudo ./odoo_installer.sh
 
 El asistente te guiará por las siguientes opciones:
 
-#### 4.1 Selección de Perfil de Recursos ⭐ NUEVO
+#### 4.1 Selección de Perfil de Recursos ⭐ ACTUALIZADO
 
 El script detecta automáticamente la RAM del servidor y recomienda el perfil óptimo:
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║  OPCIÓN 1: MÍNIMO (512 MB RAM) - Recomendado DigitalOcean $4 ║
-║  • 512 MB RAM / 1 CPU                                        ║
-║  • 5 GB SSD (mínimo requerido)                               ║
-║  • Swap: 3GB, Workers: 0, Límites muy estrictos              ║
+║  OPCIÓN 1: BÁSICO (900 MB+ RAM) - DigitalOcean $6            ║
+║  • 900 MB+ RAM / 1 CPU                                       ║
+║  • 8 GB SSD (mínimo requerido)                               ║
+║  • Swap: 2GB, Workers: 0, Optimizado para bajos recursos     ║
 ╠══════════════════════════════════════════════════════════════╣
-║  OPCIÓN 2: BÁSICO (1 GB RAM) - Recomendado DigitalOcean $6   ║
-║  • 1 GB RAM / 1 CPU                                          ║
-║  • 25 GB SSD                                                 ║
-║  • Swap: 2GB, Workers: 0, Límites moderados                  ║
-╠══════════════════════════════════════════════════════════════╣
-║  OPCIÓN 3: ESTÁNDAR (2 GB+ RAM) - DigitalOcean $12+          ║
+║  OPCIÓN 2: ESTÁNDAR (2 GB+ RAM) - DigitalOcean $12+          ║
 ║  • 2 GB+ RAM / 1+ CPU                                        ║
 ║  • 50 GB+ SSD                                                ║
-║  • Swap: 2GB, Workers: 2, Límites normales                   ║
+║  • Swap: 2GB, Workers: 2, Configuración normal               ║
 ╚══════════════════════════════════════════════════════════════╝
 
-RAM detectada: 512 MB - Recomendado: Opción 1 (Mínimo)
+RAM detectada: 1024 MB - Recomendado: Opción 1 (Básico)
 
-Selecciona perfil [1-3] (default: 1): 1
-✓ Perfil configurado: minimal
+Selecciona perfil [1-2] (por defecto: 1): 1
+✓ Perfil configurado: basic
 ```
 
 **Tabla de optimizaciones por perfil:**
 
-| Configuración | Mínimo (512MB) | Básico (1GB) | Estándar (2GB+) |
-|---------------|----------------|--------------|-----------------|
-| **Swap** | 3 GB | 2 GB | 2 GB |
-| **Workers** | 0 (thread) | 0 (thread) | 2 |
-| **Cron Threads** | 1 | 1 | 2 |
-| **Memory Hard** | 512 MB | 1 GB | 2.5 GB |
-| **Memory Soft** | 384 MB | 768 MB | 2 GB |
-| **PG Shared Buffers** | 16 MB | 32 MB | 128 MB |
-| **PG Max Connections** | 20 | 30 | 50 |
-| **Systemd MemoryMax** | 400 MB | 800 MB | 2 GB |
+| Configuración | Básico (900MB+) | Estándar (2GB+) |
+|---------------|-----------------|------------------|
+| **Swap** | 2 GB | 2 GB |
+| **Workers** | 0 (thread) | 2 |
+| **Cron Threads** | 1 | 2 |
+| **Memory Hard** | 1 GB | 2.5 GB |
+| **Memory Soft** | 768 MB | 2 GB |
+| **PG Shared Buffers** | 32 MB | 128 MB |
+| **PG Max Connections** | 30 | 50 |
+| **Systemd MemoryMax** | 800 MB | 2 GB |
 
 #### 4.2 Selección de Versión de Odoo
 ```
-1) Odoo 16.0 (Stable - Recommended for low resources)
-2) Odoo 17.0 (Latest Stable) [Default]
-3) Odoo 18.0 (Latest - May have issues)
+1) Odoo 16.0 (Estable - Recomendado para pocos recursos)
+2) Odoo 17.0 (Última estable) [Por defecto]
+3) Odoo 18.0 (Más reciente - Puede tener issues)
 ```
 
 #### 4.3 Configuración de Dominio
 ```
-Do you have a domain name pointing to this server? [y/N]: y
-Enter your domain name: odoo.tuempresa.com
+¿Tienes un nombre de dominio apuntando a este servidor? [y/N]: y
+Ingresa tu nombre de dominio: odoo.tuempresa.com
 ```
 > Si no tienes dominio, presiona `N` y usará la IP del servidor.
 
@@ -195,7 +190,7 @@ Path [/opt/extra-addons]: /opt/extra-addons
 
 #### 4.5 Confirmación
 ```
-Do you want to proceed with the installation? [y/N]: y
+¿Deseas continuar con la instalación? [y/N]: y
 ```
 
 ### **Paso 5: Esperar la Instalación**
@@ -534,30 +529,19 @@ cat /root/.odoo_credentials
 
 | Perfil | RAM | CPU | Disco | Precio DigitalOcean | Uso Recomendado |
 |--------|-----|-----|-------|---------------------|-----------------|
-| **Mínimo** | 512 MB | 1 vCPU | 5 GB | ~$4/mes | Desarrollo, pruebas, 1-2 usuarios |
-| **Básico** ⭐ | 1 GB | 1 vCPU | 25 GB | ~$6/mes | Pequeñas empresas, 3-5 usuarios |
+| **Básico** ⭐ | 900 MB+ | 1 vCPU | 8 GB | ~$6/mes | Pequeñas empresas, 3-5 usuarios |
 | **Estándar** | 2 GB+ | 1+ vCPU | 50 GB+ | ~$12+/mes | Producción, 10+ usuarios |
 
-> 💡 **Recomendado**: El perfil **Básico (1GB)** ofrece el mejor balance costo/rendimiento para Odoo 17.
+> 💡 **Recomendado**: El perfil **Básico (900MB+)** ofrece el mejor balance costo/rendimiento para Odoo 17.
 
 ### **Optimizaciones Automáticas por Perfil**
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│ PERFIL MÍNIMO (512 MB) - Máxima Compresión                         │
-├─────────────────────────────────────────────────────────────────────┤
-│ • Swap: 3GB (compensa RAM limitada)                                │
-│ • Workers: 0 (modo thread, sin procesos adicionales)               │
-│ • PostgreSQL: 16MB shared_buffers, 20 conexiones máx               │
-│ • Systemd: MemoryMax=400MB                                         │
-│ • Log level: warn (menos I/O de disco)                             │
-└─────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────┐
-│ PERFIL BÁSICO (1 GB) - Balance Óptimo ⭐ RECOMENDADO               │
+│ PERFIL BÁSICO (900 MB+) - Balance Óptimo ⭐ RECOMENDADO            │
 ├─────────────────────────────────────────────────────────────────────┤
 │ • Swap: 2GB                                                        │
-│ • Workers: 0 (modo thread, estable para 1GB)                       │
+│ • Workers: 0 (modo thread, estable para 900MB+)                    │
 │ • PostgreSQL: 32MB shared_buffers, 30 conexiones máx               │
 │ • Systemd: MemoryMax=800MB                                         │
 │ • Log level: warn                                                  │
