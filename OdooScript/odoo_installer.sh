@@ -3,7 +3,7 @@
 # ===============================================================================
 # Enhanced Odoo Installation Script for Ubuntu 22.04 - OPTIMIZED for Low Resources
 # ===============================================================================
-# Version: 3.2.1-20260122
+# Version: 3.2.2-20260122
 # Release Date: 2026-01-22
 # Author: Mahmoud Abel Latif, https://mah007.net
 # Modified: CODIFICANDO - Optimized for DigitalOcean Droplets
@@ -29,7 +29,7 @@
 # ===============================================================================
 
 # Script configuration
-SCRIPT_VERSION="3.2.1-20260122"
+SCRIPT_VERSION="3.2.2-20260122"
 SCRIPT_NAME="Odoo Installer - CODIFICANDO Edition"
 LOG_FILE="/tmp/odoo_install_$(date +%Y%m%d_%H%M%S).log"
 CONFIG_FILE="/tmp/odoo_install_config.conf"
@@ -984,10 +984,16 @@ step_odoo_installation() {
     
     execute_simple "chown -R $OE_USER:$OE_USER /odoo" "Setting Odoo ownership"
     
-    # Install Python requirements
+    # Install Python requirements (with --no-cache-dir to save memory)
     execute_simple "pip3 install --upgrade pip" "Upgrading pip"
-    execute_simple "pip3 install -r /odoo/odoo/requirements.txt" "Installing Odoo requirements"
-    execute_simple "pip3 install phonenumbers" "Installing phonenumbers"
+    
+    # Install problematic packages first with no cache
+    echo -e "${CYAN}Installing critical packages without cache...${NC}"
+    execute_simple "pip3 install --no-cache-dir lxml psycopg2-binary Pillow" "Installing critical packages"
+    
+    # Install remaining requirements
+    execute_simple "pip3 install --no-cache-dir -r /odoo/odoo/requirements.txt" "Installing Odoo requirements"
+    execute_simple "pip3 install --no-cache-dir phonenumbers" "Installing phonenumbers"
     
     log_message "INFO" "Odoo installation completed"
 }
