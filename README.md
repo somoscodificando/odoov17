@@ -64,7 +64,7 @@ El script detecta automáticamente la RAM del servidor y recomienda el perfil ó
 ╔══════════════════════════════════════════════════════════════╗
 ║  OPCIÓN 1: MÍNIMO (512 MB RAM) - Recomendado DigitalOcean $4 ║
 ║  • 512 MB RAM / 1 CPU                                        ║
-║  • 10 GB SSD                                                 ║
+║  • 5 GB SSD (mínimo requerido)                               ║
 ║  • Swap: 3GB, Workers: 0, Límites muy estrictos              ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  OPCIÓN 2: BÁSICO (1 GB RAM) - Recomendado DigitalOcean $6   ║
@@ -120,21 +120,27 @@ El script viene con valores **pre-configurados por defecto** para Sistemas Codif
 ║           CONFIGURACIÓN POR DEFECTO (Sistemas Codificando)   ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  API Key Name:  Odoo-SMTP                                    ║
+║  API Key:       (Debes ingresarla manualmente)               ║
 ║  Domain:        sistemascodificando.com                      ║
 ║  Email:         contacto@sistemascodificando.com             ║
 ║  SMTP User:     apikey                                       ║
 ║  SMTP Port:     2525                                         ║
 ╚══════════════════════════════════════════════════════════════╝
-
-¿Usar configuración por defecto? [Y/n]: Y
-✓ Usando configuración por defecto
-
-Ingresa tu SendGrid API Key completa:
-API Key [SG.xxx...]: SG.J8OVt0JUSjaBIyIyekQexQ.xxxxxxxxxxxxxxxx
-✓ API Key configurada
 ```
 
-> 💡 Solo necesitas ingresar tu **API Key completa** de SendGrid. Los demás valores ya están configurados.
+> ⚠️ **IMPORTANTE**: Debes agregar tu API Key de SendGrid antes de ejecutar el script.
+
+**Opción A: Variable de entorno (recomendado)**
+```bash
+export SENDGRID_API_KEY="SG.tu_api_key_aqui"
+sudo -E ./odoo_installer.sh
+```
+
+**Opción B: Editar el script directamente**
+```bash
+# Busca esta línea en el script y agrega tu key:
+SENDGRID_API_KEY="${SENDGRID_API_KEY:-}"  # <-- AGREGAR TU API KEY AQUÍ
+```
 
 #### 4.4 Configuración de Base de Datos y Módulos
 ```
@@ -504,7 +510,7 @@ cat /root/.odoo_credentials
 
 | Perfil | RAM | CPU | Disco | Precio DigitalOcean | Uso Recomendado |
 |--------|-----|-----|-------|---------------------|-----------------|
-| **Mínimo** | 512 MB | 1 vCPU | 10 GB | ~$4/mes | Desarrollo, pruebas, 1-2 usuarios |
+| **Mínimo** | 512 MB | 1 vCPU | 5 GB | ~$4/mes | Desarrollo, pruebas, 1-2 usuarios |
 | **Básico** ⭐ | 1 GB | 1 vCPU | 25 GB | ~$6/mes | Pequeñas empresas, 3-5 usuarios |
 | **Estándar** | 2 GB+ | 1+ vCPU | 50 GB+ | ~$12+/mes | Producción, 10+ usuarios |
 

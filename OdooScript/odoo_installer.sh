@@ -59,11 +59,11 @@ SSL_TYPE="letsencrypt"
 SERVER_IP=""
 
 # SendGrid Configuration (Pre-configured defaults for Sistemas Codificando)
-# Can be overridden with environment variables for security:
-#   export SENDGRID_API_KEY="SG.your_key_here"
-#   export SENDGRID_FROM_EMAIL="your@email.com"
+# ⚠️ IMPORTANTE: Agregar tu API Key aquí antes de ejecutar:
+#   export SENDGRID_API_KEY="SG.tu_api_key_aqui"
+#   O edita directamente la línea SENDGRID_API_KEY abajo
 SENDGRID_ENABLED="false"
-SENDGRID_API_KEY="${SENDGRID_API_KEY:-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}"
+SENDGRID_API_KEY="${SENDGRID_API_KEY:-}"  # <-- AGREGAR TU API KEY AQUÍ: SG.xxxxx
 SENDGRID_API_KEY_NAME="Odoo-SMTP"
 SENDGRID_FROM_DOMAIN="${SENDGRID_FROM_DOMAIN:-sistemascodificando.com}"
 SENDGRID_FROM_EMAIL="${SENDGRID_FROM_EMAIL:-contacto@sistemascodificando.com}"
@@ -366,7 +366,7 @@ configure_sendgrid() {
     echo -e "${BOLD}${YELLOW}║           CONFIGURACIÓN POR DEFECTO (Sistemas Codificando)   ║${NC}"
     echo -e "${BOLD}${YELLOW}╠══════════════════════════════════════════════════════════════╣${NC}"
     echo -e "${YELLOW}║  API Key Name:  ${WHITE}$SENDGRID_API_KEY_NAME${NC}"
-    echo -e "${YELLOW}║  API Key:       ${WHITE}SG.J8OVt...AJE (pre-configurada)${NC}"
+    echo -e "${YELLOW}║  API Key:       ${WHITE}(Debes ingresarla manualmente)${NC}"
     echo -e "${YELLOW}║  Domain:        ${WHITE}$SENDGRID_FROM_DOMAIN${NC}"
     echo -e "${YELLOW}║  Email:         ${WHITE}$SENDGRID_FROM_EMAIL${NC}"
     echo -e "${YELLOW}║  SMTP User:     ${WHITE}apikey${NC}"
@@ -379,9 +379,16 @@ configure_sendgrid() {
         read -r sendgrid_input
         case "$sendgrid_input" in
             [Yy]|[Yy][Ee][Ss]|"")
+                if [ -z "$SENDGRID_API_KEY" ]; then
+                    echo -e "${RED}✗ ERROR: No hay API Key configurada${NC}"
+                    echo -e "${YELLOW}Debes editar el script y agregar tu API Key en la línea:${NC}"
+                    echo -e "${WHITE}SENDGRID_API_KEY=\"SG.tu_api_key_aqui\"${NC}"
+                    echo -e "${YELLOW}O usar variable de entorno: export SENDGRID_API_KEY=\"SG.xxx\"${NC}"
+                    continue
+                fi
                 SENDGRID_ENABLED="true"
-                echo -e "${GREEN}✓ Usando configuración por defecto con API Key pre-configurada${NC}"
-                echo -e "${GREEN}✓ API Key: SG.J8OVt0JU...${NC}"
+                echo -e "${GREEN}✓ Usando configuración con tu API Key${NC}"
+                echo -e "${GREEN}✓ API Key: ${SENDGRID_API_KEY:0:15}...${NC}"
                 break
                 ;;
             [Nn]|[Nn][Oo])
@@ -638,8 +645,8 @@ select_resource_profile() {
     echo -e "${BOLD}${YELLOW}╔══════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${YELLOW}║  OPCIÓN 1: MÍNIMO (512 MB RAM) - Recomendado DigitalOcean \$4 ║${NC}"
     echo -e "${YELLOW}║  • 512 MB RAM / 1 CPU                                        ║${NC}"
-    echo -e "${YELLOW}║  • 10 GB SSD                                                 ║${NC}"
-    echo -e "${YELLOW}║  • Swap: 2GB, Workers: 0, Límites muy estrictos              ║${NC}"
+    echo -e "${YELLOW}║  • 5 GB SSD (mínimo requerido)                               ║${NC}"
+    echo -e "${YELLOW}║  • Swap: 3GB, Workers: 0, Límites muy estrictos              ║${NC}"
     echo -e "${BOLD}${YELLOW}╠══════════════════════════════════════════════════════════════╣${NC}"
     echo -e "${YELLOW}║  OPCIÓN 2: BÁSICO (1 GB RAM) - Recomendado DigitalOcean \$6  ║${NC}"
     echo -e "${YELLOW}║  • 1 GB RAM / 1 CPU                                          ║${NC}"
