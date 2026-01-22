@@ -59,17 +59,20 @@ SSL_TYPE="letsencrypt"
 SERVER_IP=""
 
 # SendGrid Configuration (Pre-configured defaults for Sistemas Codificando)
+# Can be overridden with environment variables for security:
+#   export SENDGRID_API_KEY="SG.your_key_here"
+#   export SENDGRID_FROM_EMAIL="your@email.com"
 SENDGRID_ENABLED="false"
-SENDGRID_API_KEY="SG.J8OVt0JUSjaBIyIyekQexQ.YOUR_SECRET_KEY"  # Replace with full API key
+SENDGRID_API_KEY="${SENDGRID_API_KEY:-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}"
 SENDGRID_API_KEY_NAME="Odoo-SMTP"
-SENDGRID_FROM_DOMAIN="sistemascodificando.com"
-SENDGRID_FROM_EMAIL="contacto@sistemascodificando.com"
+SENDGRID_FROM_DOMAIN="${SENDGRID_FROM_DOMAIN:-sistemascodificando.com}"
+SENDGRID_FROM_EMAIL="${SENDGRID_FROM_EMAIL:-contacto@sistemascodificando.com}"
 SENDGRID_SMTP_USER="apikey"
-SENDGRID_SMTP_PASS=""  # Will be set to API key
+SENDGRID_SMTP_PASS="${SENDGRID_API_KEY}"
 
 # Default Modules to Install (comma-separated)
 # Common modules: sale,purchase,stock,account,crm,project,hr,website
-DEFAULT_MODULES="sale,purchase,stock,account,crm"
+DEFAULT_MODULES="${DEFAULT_MODULES:-sale,purchase,stock,account,crm}"
 
 # Database Configuration
 CREATE_DEFAULT_DB="true"
@@ -239,21 +242,44 @@ check_system_requirements() {
         log_message "WARNING" "This script is optimized for Ubuntu 22.04. Current version: $(lsb_release -d | cut -f2)"
     fi
     
-    # Check available disk space (minimum 10GB)
+    # Check available disk space based on resource profile
     local available_space=$(df / | awk 'NR==2 {print $4}')
-    local required_space=10485760  # 10GB in KB
+    local required_space=10485760  # 10GB in KB (default)
+    local required_gb=10
+    
+    # Adjust disk requirement based on profile
+    case "$RESOURCE_PROFILE" in
+        "minimal")
+            required_space=5242880   # 5GB in KB for minimal profile
+            required_gb=5
+            ;;
+        "basic")
+            required_space=8388608   # 8GB in KB for basic profile
+            required_gb=8
+            ;;
+        "standard")
+            required_space=10485760  # 10GB in KB for standard profile
+            required_gb=10
+            ;;
+    esac
+    
+    local available_gb=$((available_space/1024/1024))
     
     if [ "$available_space" -lt "$required_space" ]; then
-        log_message "ERROR" "Insufficient disk space. Required: 10GB, Available: $((available_space/1024/1024))GB"
+        log_message "ERROR" "Insufficient disk space. Required: ${required_gb}GB, Available: ${available_gb}GB"
         errors=$((errors + 1))
+    else
+        log_message "INFO" "Disk space OK: ${available_gb}GB available (${required_gb}GB required for $RESOURCE_PROFILE profile)"
     fi
     
     # Check memory - WARNING for low memory but continue (we'll add swap)
     local total_memory=$(free -m | awk 'NR==2{print $2}')
-    if [ "$total_memory" -lt 1024 ]; then
-        log_message "WARNING" "Very low memory: ${total_memory}MB. Will configure swap and optimize settings."
+    if [ "$total_memory" -lt 512 ]; then
+        log_message "WARNING" "Very low memory: ${total_memory}MB. Will configure 3GB swap and ultra-optimize settings."
+    elif [ "$total_memory" -lt 1024 ]; then
+        log_message "WARNING" "Low memory: ${total_memory}MB. Will configure swap and optimize settings."
     elif [ "$total_memory" -lt 2048 ]; then
-        log_message "INFO" "Low memory detected: ${total_memory}MB. Will optimize for low resource usage."
+        log_message "INFO" "Memory: ${total_memory}MB. Will optimize for low resource usage."
     fi
     
     # Check internet connectivity
@@ -340,6 +366,7 @@ configure_sendgrid() {
     echo -e "${BOLD}${YELLOW}║           CONFIGURACIÓN POR DEFECTO (Sistemas Codificando)   ║${NC}"
     echo -e "${BOLD}${YELLOW}╠══════════════════════════════════════════════════════════════╣${NC}"
     echo -e "${YELLOW}║  API Key Name:  ${WHITE}$SENDGRID_API_KEY_NAME${NC}"
+    echo -e "${YELLOW}║  API Key:       ${WHITE}SG.J8OVt...AJE (pre-configurada)${NC}"
     echo -e "${YELLOW}║  Domain:        ${WHITE}$SENDGRID_FROM_DOMAIN${NC}"
     echo -e "${YELLOW}║  Email:         ${WHITE}$SENDGRID_FROM_EMAIL${NC}"
     echo -e "${YELLOW}║  SMTP User:     ${WHITE}apikey${NC}"
@@ -348,29 +375,13 @@ configure_sendgrid() {
     echo
     
     while true; do
-        echo -e -n "${BOLD}${WHITE}¿Usar configuración por defecto? [Y/n]: ${NC}"
+        echo -e -n "${BOLD}${WHITE}¿Usar configuración por defecto (API Key incluida)? [Y/n]: ${NC}"
         read -r sendgrid_input
         case "$sendgrid_input" in
             [Yy]|[Yy][Ee][Ss]|"")
                 SENDGRID_ENABLED="true"
-                echo -e "${GREEN}✓ Usando configuración por defecto${NC}"
-                echo
-                # Only ask for API Key since it's sensitive
-                echo -e "${CYAN}Ingresa tu SendGrid API Key completa:${NC}"
-                echo -e "${YELLOW}(La API Key comienza con 'SG.' - Obtenerla en: SendGrid → Settings → API Keys)${NC}"
-                while true; do
-                    echo -e -n "${BOLD}${WHITE}API Key [SG.xxx...]: ${NC}"
-                    read -r api_key_input
-                    
-                    if [ -n "$api_key_input" ]; then
-                        SENDGRID_API_KEY="$api_key_input"
-                        SENDGRID_SMTP_PASS="$api_key_input"
-                        echo -e "${GREEN}✓ API Key configurada${NC}"
-                        break
-                    else
-                        echo -e "${RED}La API Key no puede estar vacía.${NC}"
-                    fi
-                done
+                echo -e "${GREEN}✓ Usando configuración por defecto con API Key pre-configurada${NC}"
+                echo -e "${GREEN}✓ API Key: SG.J8OVt0JU...${NC}"
                 break
                 ;;
             [Nn]|[Nn][Oo])
