@@ -3,7 +3,7 @@
 # ===============================================================================
 # Enhanced Odoo Installation Script for Ubuntu 22.04 - OPTIMIZED for Low Resources
 # ===============================================================================
-# Version: 3.2.2-20260122
+# Version: 3.2.3-20260122
 # Release Date: 2026-01-22
 # Author: Mahmoud Abel Latif, https://mah007.net
 # Modified: CODIFICANDO - Optimized for DigitalOcean Droplets
@@ -21,7 +21,7 @@
 #   - Memory optimization with swap configuration
 #   - SendGrid SMTP direct API Key configuration
 #   - Public links configuration (proxy_mode, web.base.url)
-#   - Default database "CODIFICANDO" creation with custom credentials
+#   - Default database "CODIFICANDO" configurable (no auto-creation)
 #   - Extra addons directory at /opt/extra-addons
 #   - Custom module repository cloning
 #   - Spanish interface for better user experience
@@ -29,7 +29,7 @@
 # ===============================================================================
 
 # Script configuration
-SCRIPT_VERSION="3.2.2-20260122"
+SCRIPT_VERSION="3.2.3-20260122"
 SCRIPT_NAME="Odoo Installer - CODIFICANDO Edition"
 LOG_FILE="/tmp/odoo_install_$(date +%Y%m%d_%H%M%S).log"
 CONFIG_FILE="/tmp/odoo_install_config.conf"
@@ -80,7 +80,7 @@ SENDGRID_SMTP_PASS="${SENDGRID_API_KEY}"
 DEFAULT_MODULES="${DEFAULT_MODULES:-pos,stock,purchase,account,sale}"
 
 # Database Configuration
-CREATE_DEFAULT_DB="true"
+CREATE_DEFAULT_DB="false"  # No auto-create; user can create from Odoo UI
 DEFAULT_DB_NAME="CODIFICANDO"
 DB_ADMIN_USER="contacto@sistemascodificando.com"
 DB_ADMIN_PASSWORD="@Multiboot97"
@@ -930,7 +930,7 @@ step_dependencies_installation() {
         "git" "python3-pip" "python3-dev" "python3-venv" "python3-wheel"
         "libxml2-dev" "libxslt1-dev" "libldap2-dev" "libsasl2-dev"
         "libjpeg-dev" "zlib1g-dev" "libpq-dev" "libfreetype6-dev"
-        "build-essential" "node-less" "npm"
+        "build-essential" "node-less" "npm" "python3-psycopg2"
     )
     
     echo -e "${CYAN}Installing system packages...${NC}"
@@ -984,15 +984,17 @@ step_odoo_installation() {
     
     execute_simple "chown -R $OE_USER:$OE_USER /odoo" "Setting Odoo ownership"
     
-    # Install Python requirements (with --no-cache-dir to save memory)
-    execute_simple "pip3 install --upgrade pip" "Upgrading pip"
-    
-    # Install problematic packages first with no cache
-    echo -e "${CYAN}Installing critical packages without cache...${NC}"
+    # Install Python requirements with pinned, prebuilt wheels to avoid build failures
+    execute_simple "pip3 install --upgrade pip setuptools wheel" "Upgrading pip/build tools"
+
+    # Preinstall critical packages to avoid missing drivers and reduce build load
     execute_simple "pip3 install --no-cache-dir lxml psycopg2-binary Pillow" "Installing critical packages"
-    
-    # Install remaining requirements
-    execute_simple "pip3 install --no-cache-dir -r /odoo/odoo/requirements.txt" "Installing Odoo requirements"
+    execute_simple "pip3 install --no-cache-dir 'greenlet>=2.0.2' 'gevent>=22.10.2,<24'" "Installing gevent/greenlet (compatible wheels)"
+    execute_simple "pip3 install --no-cache-dir 'Werkzeug>=2.2,<3' num2words" "Installing Werkzeug/num2words"
+
+    # Install remaining requirements excluding gevent/greenlet (already handled)
+    execute_simple "grep -viE '^(gevent|greenlet)=' /odoo/odoo/requirements.txt > /tmp/odoo_req_nogevent.txt" "Preparing requirements list"
+    execute_simple "pip3 install --no-cache-dir -r /tmp/odoo_req_nogevent.txt" "Installing Odoo requirements"
     execute_simple "pip3 install --no-cache-dir phonenumbers" "Installing phonenumbers"
     
     log_message "INFO" "Odoo installation completed"
@@ -1567,9 +1569,8 @@ ACCESS URLs:
 
 CREDENTIALS:
 ------------
-- Master Password: $DB_ADMIN_PASSWORD
-- Admin User: admin
-- Admin Password: admin (CHANGE THIS!)
+- Master Password: $DB_ADMIN_PASSWORD (guardada en /root/.odoo_credentials)
+- Admin credentials: crear al generar la base desde Odoo (/web/database/manager)
 
 SENDGRID CONFIGURATION:
 -----------------------
@@ -1631,8 +1632,8 @@ show_success_message() {
     echo -e "${CYAN}Access your Odoo:${NC}"
     echo -e "  ${BOLD}${WHITE}$web_url${NC}"
     echo
-    echo -e "${CYAN}Default Database:${NC} $DEFAULT_DB_NAME"
-    echo -e "${CYAN}Admin Login:${NC} admin / admin ${YELLOW}(change this!)${NC}"
+    echo -e "${CYAN}Default Database (auto-create):${NC} $CREATE_DEFAULT_DB"
+    echo -e "${CYAN}Crea la base desde:${NC} $web_url/web/database/manager"
     echo -e "${CYAN}Master Password:${NC} Saved in /root/.odoo_credentials"
     echo
     if [ "$SENDGRID_ENABLED" = "true" ]; then

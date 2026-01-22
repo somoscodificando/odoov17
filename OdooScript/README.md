@@ -1,6 +1,6 @@
 # Enhanced Odoo Installer
 
-[![Version](https://img.shields.io/badge/Version-3.2.2--20260122-blue.svg)](https://github.com/somoscodificando/odoov17)
+[![Version](https://img.shields.io/badge/Version-3.2.3--20260122-blue.svg)](https://github.com/somoscodificando/odoov17)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Ubuntu](https://img.shields.io/badge/Ubuntu-22.04%20LTS-orange.svg)](https://ubuntu.com/)
 [![Odoo](https://img.shields.io/badge/Odoo-14.0%20to%2018.0-purple.svg)](https://www.odoo.com/)
@@ -9,11 +9,14 @@
 
 > **Professional Odoo installation script with domain configuration, official Nginx, SSL certificates, and dynamic configuration generation for Ubuntu 22.04**
 
-## 📦 Versión Actual: `3.2.2-20260122`
+## 📦 Versión Actual: `3.2.3-20260122`
 
 **Cambios en esta versión:**
-- 🐛 **FIX CRÍTICO**: Instalación de requirements con `--no-cache-dir` (soluciona error Step 7)
-- 🐛 **FIX**: Instalación de paquetes críticos (lxml, psycopg2, Pillow) antes del resto
+- 🐛 **FIX CRÍTICO**: gevent/greenlet con wheels precompilados (`gevent>=22.10.2,<24`, `greenlet>=2.0.2`), evitando fallas al compilar
+- 🐛 **FIX**: `pip install --no-cache-dir` y upgrade de pip/setuptools/wheel antes de requirements
+- 🐛 **FIX**: psycopg2 de sistema (`python3-psycopg2`) + lxml/Pillow instalados primero
+- 🐛 **FIX**: Werkzeug/num2words preinstalados (evita ModuleNotFoundError)
+- 🔧 Base de datos por defecto ya **no se crea automáticamente** (CREATE_DEFAULT_DB=false)
 - ✅ Credenciales personalizadas: contacto@sistemascodificando.com / @Multiboot97
 - ✅ Módulos actualizados: pos, stock, purchase, account, sale
 - ✅ Eliminado perfil mínimo (512 MB) - Requiere 900 MB+ ahora
@@ -24,7 +27,7 @@
 **Verificar versión instalada:**
 ```bash
 head -10 odoo_installer.sh | grep "Version"
-# Debe mostrar: Version: 3.2.2-20260122
+# Debe mostrar: Version: 3.2.3-20260122
 ```
 
 ## 🚀 Quick Start
@@ -483,7 +486,7 @@ cat /root/.odoo_credentials
 - Headers de proxy correctos en Nginx
 
 ### 🗄️ **Base de Datos y Addons Personalizados**
-- Creación automática de base de datos "CODIFICANDO"
+- Base de datos por defecto configurable (no se crea automáticamente)
 - Directorio `/opt/extra-addons` listo para módulos personalizados
 - Credenciales guardadas de forma segura en `/root/.odoo_credentials`
 - Path de addons configurado automáticamente
