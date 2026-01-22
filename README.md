@@ -1,5 +1,6 @@
 # Enhanced Odoo Installer
 
+[![Version](https://img.shields.io/badge/Version-3.1.0--20260122-blue.svg)](https://github.com/somoscodificando/odoov17)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Ubuntu](https://img.shields.io/badge/Ubuntu-22.04%20LTS-orange.svg)](https://ubuntu.com/)
 [![Odoo](https://img.shields.io/badge/Odoo-14.0%20to%2018.0-purple.svg)](https://www.odoo.com/)
@@ -8,6 +9,20 @@
 
 > **Professional Odoo installation script with domain configuration, official Nginx, SSL certificates, and dynamic configuration generation for Ubuntu 22.04**
 
+## 📦 Versión Actual: `3.1.0-20260122`
+
+**Cambios en esta versión:**
+- ✅ Perfil mínimo: 5 GB disco (antes 10 GB)
+- ✅ Perfil mínimo: 3 GB swap (antes 2 GB)  
+- ✅ API Key de SendGrid removida (agregar manualmente)
+- ✅ Soporte para servidores 512 MB RAM
+
+**Verificar versión instalada:**
+```bash
+head -10 odoo_installer.sh | grep "Version"
+# Debe mostrar: Version: 3.1.0-20260122
+```
+
 ## 🚀 Quick Start
 
 ```bash
@@ -15,6 +30,9 @@
 wget https://raw.githubusercontent.com/somoscodificando/odoov17/main/OdooScript/odoo_installer.sh
 # Make it executable
 chmod +x odoo_installer.sh
+
+# Verify version
+head -10 odoo_installer.sh | grep "Version"
 
 # Run the installer
 sudo ./odoo_installer.sh

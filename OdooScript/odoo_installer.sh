@@ -3,28 +3,31 @@
 # ===============================================================================
 # Enhanced Odoo Installation Script for Ubuntu 22.04 - OPTIMIZED for Low Resources
 # ===============================================================================
-# Version: 3.0-OPTIMIZED
+# Version: 3.1.0-20260122
+# Release Date: 2026-01-22
 # Author: Mahmoud Abel Latif, https://mah007.net
 # Modified: CODIFICANDO - Optimized for DigitalOcean Droplets
-# Description: Odoo installation optimized for 1GB RAM servers with SendGrid,
+# Description: Odoo installation optimized for 512MB-2GB RAM servers with SendGrid,
 #              public links configuration, and automatic database creation
 #
-# MINIMUM REQUIREMENTS:
-#   - 1 GB Memory
+# MINIMUM REQUIREMENTS (Perfil Mínimo):
+#   - 512 MB Memory (with 3GB swap)
 #   - 1 Intel vCPU  
-#   - 35 GB Disk
+#   - 5 GB Disk
 #   - Ubuntu 22.04 (LTS) x64
 #
 # FEATURES:
+#   - 3 Resource profiles: minimal (512MB), basic (1GB), standard (2GB+)
 #   - Memory optimization with swap configuration
 #   - SendGrid SMTP auto-configuration
 #   - Public links configuration (proxy_mode, web.base.url)
 #   - Default database "CODIFICANDO" creation
 #   - Extra addons directory at /opt/extra-addons
+#   - Custom module repository cloning
 # ===============================================================================
 
 # Script configuration
-SCRIPT_VERSION="3.0-OPTIMIZED"
+SCRIPT_VERSION="3.1.0-20260122"
 SCRIPT_NAME="Odoo Installer - CODIFICANDO Edition"
 LOG_FILE="/tmp/odoo_install_$(date +%Y%m%d_%H%M%S).log"
 CONFIG_FILE="/tmp/odoo_install_config.conf"
