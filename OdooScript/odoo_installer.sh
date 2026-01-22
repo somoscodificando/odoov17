@@ -75,13 +75,14 @@ SENDGRID_SMTP_USER="apikey"
 SENDGRID_SMTP_PASS="${SENDGRID_API_KEY}"
 
 # Default Modules to Install (comma-separated)
-# Common modules: sale,purchase,stock,account,crm,project,hr,website
-DEFAULT_MODULES="${DEFAULT_MODULES:-sale,purchase,stock,account,crm}"
+# Módulos configurados: pos (Punto de Venta), stock (Inventario), purchase (Compras), account (Contabilidad), sale (Ventas)
+DEFAULT_MODULES="${DEFAULT_MODULES:-pos,stock,purchase,account,sale}"
 
 # Database Configuration
 CREATE_DEFAULT_DB="true"
 DEFAULT_DB_NAME="CODIFICANDO"
-DB_ADMIN_PASSWORD=""
+DB_ADMIN_USER="contacto@sistemascodificando.com"
+DB_ADMIN_PASSWORD="@Multiboot97"
 
 # Extra Addons
 EXTRA_ADDONS_PATH="/opt/extra-addons"
@@ -1082,6 +1083,8 @@ EOF
 
 ODOO_MASTER_PASSWORD=$DB_ADMIN_PASSWORD
 ODOO_DEFAULT_DATABASE=$DEFAULT_DB_NAME
+ODOO_ADMIN_USER=$DB_ADMIN_USER
+ODOO_ADMIN_PASSWORD=$DB_ADMIN_PASSWORD
 ODOO_URL=$web_base_url
 EOF
     
@@ -1395,15 +1398,15 @@ create_default_database() {
     curl -s -X POST "http://localhost:8069/web/database/create" \
         -F "master_pwd=$DB_ADMIN_PASSWORD" \
         -F "name=$DEFAULT_DB_NAME" \
-        -F "login=admin" \
-        -F "password=admin" \
+        -F "login=$DB_ADMIN_USER" \
+        -F "password=$DB_ADMIN_PASSWORD" \
         -F "lang=es_ES" \
         -F "country_code=CO" \
         >> "$LOG_FILE" 2>&1
     
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✓ Database '$DEFAULT_DB_NAME' created${NC}"
-        echo -e "${YELLOW}  Default credentials: admin / admin${NC}"
+        echo -e "${YELLOW}  Credenciales: $DB_ADMIN_USER / $DB_ADMIN_PASSWORD${NC}"
         log_message "INFO" "Default database created: $DEFAULT_DB_NAME"
         
         # Install default modules if configured
