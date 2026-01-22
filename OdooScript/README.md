@@ -1,6 +1,6 @@
 # Enhanced Odoo Installer
 
-[![Version](https://img.shields.io/badge/Version-3.1.0--20260122-blue.svg)](https://github.com/somoscodificando/odoov17)
+[![Version](https://img.shields.io/badge/Version-3.2.0--20260122-blue.svg)](https://github.com/somoscodificando/odoov17)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Ubuntu](https://img.shields.io/badge/Ubuntu-22.04%20LTS-orange.svg)](https://ubuntu.com/)
 [![Odoo](https://img.shields.io/badge/Odoo-14.0%20to%2018.0-purple.svg)](https://www.odoo.com/)
@@ -9,18 +9,18 @@
 
 > **Professional Odoo installation script with domain configuration, official Nginx, SSL certificates, and dynamic configuration generation for Ubuntu 22.04**
 
-## 📦 Versión Actual: `3.1.0-20260122`
+## 📦 Versión Actual: `3.2.0-20260122`
 
 **Cambios en esta versión:**
-- ✅ Perfil mínimo: 5 GB disco (antes 10 GB)
-- ✅ Perfil mínimo: 3 GB swap (antes 2 GB)  
-- ✅ API Key de SendGrid removida (agregar manualmente)
-- ✅ Soporte para servidores 512 MB RAM
+- ✅ Eliminado perfil mínimo (512 MB) - Requiere 900 MB+ ahora
+- ✅ Simplificado a 2 perfiles: Básico (900 MB+) y Estándar (2 GB+)
+- ✅ SendGrid: Ingreso directo de API Key (sin configuración previa)
+- ✅ Interfaz traducida a español para mejor experiencia de usuario
 
 **Verificar versión instalada:**
 ```bash
 head -10 odoo_installer.sh | grep "Version"
-# Debe mostrar: Version: 3.1.0-20260122
+# Debe mostrar: Version: 3.2.0-20260122
 ```
 
 ## 🚀 Quick Start
@@ -129,24 +129,30 @@ Enter your domain name: odoo.tuempresa.com
 ```
 > Si no tienes dominio, presiona `N` y usará la IP del servidor.
 
-#### 4.3 Configuración de SendGrid (Email)
+#### 4.3 Configuración de SendGrid (Email) ⭐ SIMPLIFICADO
 
-El script viene con valores **pre-configurados por defecto** para Sistemas Codificando:
+El script solicita directamente tu API Key de SendGrid:
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║           CONFIGURACIÓN POR DEFECTO (Sistemas Codificando)   ║
+║           CONFIGURACIÓN (Sistemas Codificando)               ║
 ╠══════════════════════════════════════════════════════════════╣
-║  API Key Name:  Odoo-SMTP                                    ║
-║  API Key:       (Debes ingresarla manualmente)               ║
-║  Domain:        sistemascodificando.com                      ║
+║  Dominio:       sistemascodificando.com                      ║
 ║  Email:         contacto@sistemascodificando.com             ║
-║  SMTP User:     apikey                                       ║
-║  SMTP Port:     2525                                         ║
+║  Usuario SMTP:  apikey                                       ║
+║  Puerto SMTP:   2525                                         ║
 ╚══════════════════════════════════════════════════════════════╝
+
+Ingresa tu SendGrid API Key:
+(Puedes obtenerla en: SendGrid → Settings → API Keys)
+(Déjalo vacío para omitir y configurar después en Odoo)
+
+API Key [SG.xxx...]: SG.tu_api_key_aqui
+✓ API Key configurada
+✓ Key: SG.xxxxxxxxxxxxx...
 ```
 
-> ⚠️ **IMPORTANTE**: Debes agregar tu API Key de SendGrid antes de ejecutar el script.
+> 💡 **TIP**: Si no tienes una API Key de SendGrid aún, puedes presionar Enter para omitir este paso y configurarlo más tarde desde la interfaz de Odoo.
 
 **Opción A: Variable de entorno (recomendado)**
 ```bash

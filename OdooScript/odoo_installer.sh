@@ -3,31 +3,32 @@
 # ===============================================================================
 # Enhanced Odoo Installation Script for Ubuntu 22.04 - OPTIMIZED for Low Resources
 # ===============================================================================
-# Version: 3.1.0-20260122
+# Version: 3.2.0-20260122
 # Release Date: 2026-01-22
 # Author: Mahmoud Abel Latif, https://mah007.net
 # Modified: CODIFICANDO - Optimized for DigitalOcean Droplets
-# Description: Odoo installation optimized for 512MB-2GB RAM servers with SendGrid,
+# Description: Odoo installation optimized for 900MB-2GB RAM servers with SendGrid,
 #              public links configuration, and automatic database creation
 #
-# MINIMUM REQUIREMENTS (Perfil Mínimo):
-#   - 512 MB Memory (with 3GB swap)
+# MINIMUM REQUIREMENTS (Perfil Básico):
+#   - 900 MB Memory (with 2GB swap)
 #   - 1 Intel vCPU  
-#   - 5 GB Disk
+#   - 8 GB Disk
 #   - Ubuntu 22.04 (LTS) x64
 #
 # FEATURES:
-#   - 3 Resource profiles: minimal (512MB), basic (1GB), standard (2GB+)
+#   - 2 Resource profiles: basic (900MB+), standard (2GB+)
 #   - Memory optimization with swap configuration
-#   - SendGrid SMTP auto-configuration
+#   - SendGrid SMTP direct API Key configuration
 #   - Public links configuration (proxy_mode, web.base.url)
 #   - Default database "CODIFICANDO" creation
 #   - Extra addons directory at /opt/extra-addons
 #   - Custom module repository cloning
+#   - Spanish interface for better user experience
 # ===============================================================================
 
 # Script configuration
-SCRIPT_VERSION="3.1.0-20260122"
+SCRIPT_VERSION="3.2.0-20260122"
 SCRIPT_NAME="Odoo Installer - CODIFICANDO Edition"
 LOG_FILE="/tmp/odoo_install_$(date +%Y%m%d_%H%M%S).log"
 CONFIG_FILE="/tmp/odoo_install_config.conf"
@@ -252,10 +253,6 @@ check_system_requirements() {
     
     # Adjust disk requirement based on profile
     case "$RESOURCE_PROFILE" in
-        "minimal")
-            required_space=5242880   # 5GB in KB for minimal profile
-            required_gb=5
-            ;;
         "basic")
             required_space=8388608   # 8GB in KB for basic profile
             required_gb=8
@@ -269,20 +266,18 @@ check_system_requirements() {
     local available_gb=$((available_space/1024/1024))
     
     if [ "$available_space" -lt "$required_space" ]; then
-        log_message "ERROR" "Insufficient disk space. Required: ${required_gb}GB, Available: ${available_gb}GB"
+        log_message "ERROR" "Espacio en disco insuficiente. Requerido: ${required_gb}GB, Disponible: ${available_gb}GB"
         errors=$((errors + 1))
     else
-        log_message "INFO" "Disk space OK: ${available_gb}GB available (${required_gb}GB required for $RESOURCE_PROFILE profile)"
+        log_message "INFO" "Espacio en disco OK: ${available_gb}GB disponibles (${required_gb}GB requeridos para perfil $RESOURCE_PROFILE)"
     fi
     
     # Check memory - WARNING for low memory but continue (we'll add swap)
     local total_memory=$(free -m | awk 'NR==2{print $2}')
-    if [ "$total_memory" -lt 512 ]; then
-        log_message "WARNING" "Very low memory: ${total_memory}MB. Will configure 3GB swap and ultra-optimize settings."
-    elif [ "$total_memory" -lt 1024 ]; then
-        log_message "WARNING" "Low memory: ${total_memory}MB. Will configure swap and optimize settings."
-    elif [ "$total_memory" -lt 2048 ]; then
-        log_message "INFO" "Memory: ${total_memory}MB. Will optimize for low resource usage."
+    if [ "$total_memory" -lt 900 ]; then
+        log_message "WARNING" "Memoria muy baja: ${total_memory}MB. Se recomienda mínimo 900MB RAM. Se configurará swap y optimizaciones."
+    elif [ "$total_memory" -lt 1800 ]; then
+        log_message "INFO" "Memoria: ${total_memory}MB. Se optimizará para bajo consumo de recursos."
     fi
     
     # Check internet connectivity
@@ -300,17 +295,17 @@ check_system_requirements() {
 
 configure_domain() {
     clear
-    display_billboard "Domain Configuration"
+    display_billboard "Configuración de Dominio"
     
-    echo -e "${BOLD}${WHITE}Domain Setup for Odoo Installation${NC}"
+    echo -e "${BOLD}${WHITE}Configuración de Dominio para la Instalación de Odoo${NC}"
     echo
     
     get_server_ip
-    echo -e "${YELLOW}Your server IP address: ${BOLD}$SERVER_IP${NC}"
+    echo -e "${YELLOW}Tu dirección IP del servidor: ${BOLD}$SERVER_IP${NC}"
     echo
     
     while true; do
-        echo -e -n "${BOLD}${WHITE}Do you have a domain name pointing to this server? [y/N]: ${NC}"
+        echo -e -n "${BOLD}${WHITE}¿Tienes un nombre de dominio apuntando a este servidor? [y/N]: ${NC}"
         read -r has_domain_input
         case "$has_domain_input" in
             [Yy]|[Yy][Ee][Ss])
@@ -322,26 +317,26 @@ configure_domain() {
                 break
                 ;;
             *)
-                echo -e "${RED}Please answer yes (y) or no (n).${NC}"
+                echo -e "${RED}Por favor responde sí (y) o no (n).${NC}"
                 ;;
         esac
     done
     
     if [ "$HAS_DOMAIN" = "true" ]; then
         while true; do
-            echo -e -n "${BOLD}${WHITE}Enter your domain name (e.g., odoo.sistemascodificando.com): ${NC}"
+            echo -e -n "${BOLD}${WHITE}Ingresa tu nombre de dominio (ej: odoo.sistemascodificando.com): ${NC}"
             read -r domain_input
             
             if [ -n "$domain_input" ]; then
                 if [[ "$domain_input" =~ ^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$ ]]; then
                     DOMAIN_NAME="$domain_input"
-                    echo -e "${GREEN}Domain set to: $DOMAIN_NAME${NC}"
+                    echo -e "${GREEN}Dominio configurado: $DOMAIN_NAME${NC}"
                     break
                 else
-                    echo -e "${RED}Invalid domain format. Please enter a valid domain name.${NC}"
+                    echo -e "${RED}Formato de dominio inválido. Ingresa un nombre de dominio válido.${NC}"
                 fi
             else
-                echo -e "${RED}Domain name cannot be empty.${NC}"
+                echo -e "${RED}El nombre de dominio no puede estar vacío.${NC}"
             fi
         done
     else
@@ -355,68 +350,55 @@ configure_domain() {
 
 configure_sendgrid() {
     clear
-    display_billboard "SendGrid Email Configuration"
+    display_billboard "Configuración de Email SendGrid"
     
-    echo -e "${BOLD}${WHITE}📧 SendGrid SMTP Configuration${NC}"
+    echo -e "${BOLD}${WHITE}📧 Configuración SMTP de SendGrid${NC}"
     echo
-    echo -e "${CYAN}Configure automatic email sending using SendGrid.${NC}"
-    echo -e "${CYAN}This is recommended for DigitalOcean since ports 25, 465, 587 are blocked.${NC}"
-    echo -e "${CYAN}SendGrid uses port 2525 which works with DigitalOcean.${NC}"
+    echo -e "${CYAN}Configura el envío automático de emails usando SendGrid.${NC}"
+    echo -e "${CYAN}Recomendado para DigitalOcean ya que los puertos 25, 465, 587 están bloqueados.${NC}"
+    echo -e "${CYAN}SendGrid usa el puerto 2525 que funciona con DigitalOcean.${NC}"
     echo
     
-    # Show pre-configured defaults
+    # Mostrar configuración por defecto
     echo -e "${BOLD}${YELLOW}╔══════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BOLD}${YELLOW}║           CONFIGURACIÓN POR DEFECTO (Sistemas Codificando)   ║${NC}"
+    echo -e "${BOLD}${YELLOW}║           CONFIGURACIÓN (Sistemas Codificando)               ║${NC}"
     echo -e "${BOLD}${YELLOW}╠══════════════════════════════════════════════════════════════╣${NC}"
-    echo -e "${YELLOW}║  API Key Name:  ${WHITE}$SENDGRID_API_KEY_NAME${NC}"
-    echo -e "${YELLOW}║  API Key:       ${WHITE}(Debes ingresarla manualmente)${NC}"
-    echo -e "${YELLOW}║  Domain:        ${WHITE}$SENDGRID_FROM_DOMAIN${NC}"
+    echo -e "${YELLOW}║  Dominio:       ${WHITE}$SENDGRID_FROM_DOMAIN${NC}"
     echo -e "${YELLOW}║  Email:         ${WHITE}$SENDGRID_FROM_EMAIL${NC}"
-    echo -e "${YELLOW}║  SMTP User:     ${WHITE}apikey${NC}"
-    echo -e "${YELLOW}║  SMTP Port:     ${WHITE}2525${NC}"
+    echo -e "${YELLOW}║  Usuario SMTP:  ${WHITE}apikey${NC}"
+    echo -e "${YELLOW}║  Puerto SMTP:   ${WHITE}2525${NC}"
     echo -e "${BOLD}${YELLOW}╚══════════════════════════════════════════════════════════════╝${NC}"
     echo
     
+    # Pedir API Key directamente
+    echo -e "${BOLD}${WHITE}Ingresa tu SendGrid API Key:${NC}"
+    echo -e "${CYAN}(Puedes obtenerla en: SendGrid → Settings → API Keys)${NC}"
+    echo -e "${CYAN}(Déjalo vacío para omitir y configurar después en Odoo)${NC}"
+    echo
+    
     while true; do
-        echo -e -n "${BOLD}${WHITE}¿Usar configuración por defecto (API Key incluida)? [Y/n]: ${NC}"
-        read -r sendgrid_input
-        case "$sendgrid_input" in
-            [Yy]|[Yy][Ee][Ss]|"")
-                if [ -z "$SENDGRID_API_KEY" ]; then
-                    echo -e "${RED}✗ ERROR: No hay API Key configurada${NC}"
-                    echo -e "${YELLOW}Debes editar el script y agregar tu API Key en la línea:${NC}"
-                    echo -e "${WHITE}SENDGRID_API_KEY=\"SG.tu_api_key_aqui\"${NC}"
-                    echo -e "${YELLOW}O usar variable de entorno: export SENDGRID_API_KEY=\"SG.xxx\"${NC}"
-                    continue
-                fi
-                SENDGRID_ENABLED="true"
-                echo -e "${GREEN}✓ Usando configuración con tu API Key${NC}"
-                echo -e "${GREEN}✓ API Key: ${SENDGRID_API_KEY:0:15}...${NC}"
-                break
-                ;;
-            [Nn]|[Nn][Oo])
-                echo -e "${CYAN}¿Deseas configurar SendGrid con otros valores? [y/N]: ${NC}"
-                read -r custom_config
-                case "$custom_config" in
-                    [Yy]|[Yy][Ee][Ss])
-                        SENDGRID_ENABLED="true"
-                        configure_sendgrid_custom
-                        ;;
-                    *)
-                        SENDGRID_ENABLED="false"
-                        echo -e "${YELLOW}Configuración de SendGrid omitida. Puedes configurarlo más tarde en Odoo.${NC}"
-                        return 0
-                        ;;
-                esac
-                break
-                ;;
-            *)
-                echo -e "${RED}Por favor responde sí (y) o no (n).${NC}"
-                ;;
-        esac
+        echo -e -n "${BOLD}${WHITE}API Key [SG.xxx...]: ${NC}"
+        read -r api_key_input
+        
+        if [ -z "$api_key_input" ]; then
+            SENDGRID_ENABLED="false"
+            echo -e "${YELLOW}⚠ SendGrid omitido. Puedes configurarlo después en Odoo.${NC}"
+            log_message "INFO" "SendGrid configuration skipped"
+            return 0
+        elif [[ "$api_key_input" =~ ^SG\. ]]; then
+            SENDGRID_API_KEY="$api_key_input"
+            SENDGRID_SMTP_PASS="$api_key_input"
+            SENDGRID_ENABLED="true"
+            echo -e "${GREEN}✓ API Key configurada${NC}"
+            echo -e "${GREEN}✓ Key: ${SENDGRID_API_KEY:0:15}...${NC}"
+            break
+        else
+            echo -e "${RED}✗ API Key inválida. Debe comenzar con 'SG.'${NC}"
+            echo -e "${YELLOW}Intenta de nuevo o déjalo vacío para omitir.${NC}"
+        fi
     done
     
-    # Test SendGrid connectivity
+    # Probar conectividad SendGrid
     echo
     echo -e "${CYAN}Probando conectividad con SendGrid (puerto 2525)...${NC}"
     if nc -z -w5 smtp.sendgrid.net 2525 2>/dev/null; then
@@ -431,91 +413,40 @@ configure_sendgrid() {
 }
 
 # Custom SendGrid configuration (when user wants to change defaults)
-configure_sendgrid_custom() {
-    # Get SendGrid API Key
-    echo
-    echo -e "${CYAN}Ingresa tu SendGrid API Key:${NC}"
-    echo -e "${YELLOW}(Obtenerla en: SendGrid → Settings → API Keys → Create API Key)${NC}"
-    while true; do
-        echo -e -n "${BOLD}${WHITE}API Key: ${NC}"
-        read -r api_key_input
-        
-        if [ -n "$api_key_input" ]; then
-            SENDGRID_API_KEY="$api_key_input"
-            SENDGRID_SMTP_PASS="$api_key_input"
-            echo -e "${GREEN}✓ API Key configurada${NC}"
-            break
-        else
-            echo -e "${RED}La API Key no puede estar vacía.${NC}"
-        fi
-    done
-    
-    # Get Sending Domain
-    echo
-    echo -e "${CYAN}Ingresa tu dominio verificado en SendGrid:${NC}"
-    echo -e "${YELLOW}(Debe coincidir con tu Domain Authentication en SendGrid)${NC}"
-    while true; do
-        echo -e -n "${BOLD}${WHITE}Dominio [$SENDGRID_FROM_DOMAIN]: ${NC}"
-        read -r domain_input
-        
-        if [ -n "$domain_input" ]; then
-            SENDGRID_FROM_DOMAIN="$domain_input"
-        fi
-        echo -e "${GREEN}✓ Dominio de envío: @$SENDGRID_FROM_DOMAIN${NC}"
-        break
-    done
-    
-    # Get From Email
-    echo
-    echo -e "${CYAN}Ingresa el email del remitente:${NC}"
-    while true; do
-        echo -e -n "${BOLD}${WHITE}Email [contacto@$SENDGRID_FROM_DOMAIN]: ${NC}"
-        read -r email_input
-        
-        if [ -n "$email_input" ]; then
-            SENDGRID_FROM_EMAIL="$email_input"
-        else
-            SENDGRID_FROM_EMAIL="contacto@$SENDGRID_FROM_DOMAIN"
-        fi
-        echo -e "${GREEN}✓ Email del remitente: $SENDGRID_FROM_EMAIL${NC}"
-        break
-    done
-}
-
 configure_database() {
     clear
-    display_billboard "Database Configuration"
+    display_billboard "Configuración de Base de Datos"
     
-    echo -e "${BOLD}${WHITE}🗄️ Default Database Configuration${NC}"
+    echo -e "${BOLD}${WHITE}🗄️ Configuración de Base de Datos por Defecto${NC}"
     echo
-    echo -e "${CYAN}Configure the default Odoo database and extra addons directory.${NC}"
+    echo -e "${CYAN}Configura la base de datos de Odoo y el directorio de addons adicionales.${NC}"
     echo
     
     # Database name
-    echo -e "${CYAN}Default database name:${NC}"
-    echo -e -n "${BOLD}${WHITE}Database name [$DEFAULT_DB_NAME]: ${NC}"
+    echo -e "${CYAN}Nombre de la base de datos por defecto:${NC}"
+    echo -e -n "${BOLD}${WHITE}Nombre de base de datos [$DEFAULT_DB_NAME]: ${NC}"
     read -r db_name_input
     
     if [ -n "$db_name_input" ]; then
         DEFAULT_DB_NAME="$db_name_input"
     fi
-    echo -e "${GREEN}✓ Database name: $DEFAULT_DB_NAME${NC}"
+    echo -e "${GREEN}✓ Nombre de base de datos: $DEFAULT_DB_NAME${NC}"
     
     # Generate admin password
     DB_ADMIN_PASSWORD=$(generate_random_password)
     echo
-    echo -e "${GREEN}✓ Master password generated (saved to /root/.odoo_credentials)${NC}"
+    echo -e "${GREEN}✓ Master password generada (guardada en /root/.odoo_credentials)${NC}"
     
     # Extra addons path
     echo
-    echo -e "${CYAN}Extra addons directory:${NC}"
-    echo -e -n "${BOLD}${WHITE}Path [$EXTRA_ADDONS_PATH]: ${NC}"
+    echo -e "${CYAN}Directorio de addons adicionales:${NC}"
+    echo -e -n "${BOLD}${WHITE}Ruta [$EXTRA_ADDONS_PATH]: ${NC}"
     read -r addons_path_input
     
     if [ -n "$addons_path_input" ]; then
         EXTRA_ADDONS_PATH="$addons_path_input"
     fi
-    echo -e "${GREEN}✓ Extra addons path: $EXTRA_ADDONS_PATH${NC}"
+    echo -e "${GREEN}✓ Ruta de addons adicionales: $EXTRA_ADDONS_PATH${NC}"
     
     # Default modules to install
     echo
@@ -610,13 +541,13 @@ configure_custom_repos() {
 select_odoo_version() {
     while true; do
         clear
-        display_billboard "Odoo Version Selection"
+        display_billboard "Selección de Versión Odoo"
         
-        echo -e "${BOLD}${WHITE}Please select the Odoo version to install:${NC}"
+        echo -e "${BOLD}${WHITE}Por favor selecciona la versión de Odoo a instalar:${NC}"
         echo
-        echo -e "  ${YELLOW}1)${NC} Odoo 16.0 ${CYAN}(Stable - Recommended for low resources)${NC}"
-        echo -e "  ${YELLOW}2)${NC} Odoo 17.0 ${CYAN}(Latest Stable)${NC} ${GREEN}[Default]${NC}"
-        echo -e "  ${YELLOW}3)${NC} Odoo 18.0 ${CYAN}(Latest - May have issues)${NC}"
+        echo -e "  ${YELLOW}1)${NC} Odoo 16.0 ${CYAN}(Estable - Recomendado para pocos recursos)${NC}"
+        echo -e "  ${YELLOW}2)${NC} Odoo 17.0 ${CYAN}(Latest Stable)${NC} ${GREEN}[Por Defecto]${NC}"
+        echo -e "  ${YELLOW}3)${NC} Odoo 18.0 ${CYAN}(Más reciente - Puede tener problemas)${NC}"
         echo
         
         echo -e -n "${BOLD}${WHITE}Enter your choice [1-3] (default: 2): ${NC}"
@@ -641,25 +572,20 @@ select_odoo_version() {
 # Select server resource profile and configure optimizations
 select_resource_profile() {
     clear
-    display_billboard "Server Resource Profile"
+    display_billboard "Perfil de Recursos del Servidor"
     
     echo -e "${BOLD}${WHITE}🖥️ Selecciona el perfil de recursos de tu servidor:${NC}"
     echo
     echo -e "${BOLD}${YELLOW}╔══════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${YELLOW}║  OPCIÓN 1: MÍNIMO (512 MB RAM) - Recomendado DigitalOcean \$4 ║${NC}"
-    echo -e "${YELLOW}║  • 512 MB RAM / 1 CPU                                        ║${NC}"
-    echo -e "${YELLOW}║  • 5 GB SSD (mínimo requerido)                               ║${NC}"
-    echo -e "${YELLOW}║  • Swap: 3GB, Workers: 0, Límites muy estrictos              ║${NC}"
+    echo -e "${YELLOW}║  OPCIÓN 1: BÁSICO (900 MB+ RAM) - DigitalOcean \$6           ║${NC}"
+    echo -e "${YELLOW}║  • 900 MB+ RAM / 1 CPU                                       ║${NC}"
+    echo -e "${YELLOW}║  • 8 GB SSD (mínimo requerido)                               ║${NC}"
+    echo -e "${YELLOW}║  • Swap: 2GB, Workers: 0, Optimizado para bajos recursos     ║${NC}"
     echo -e "${BOLD}${YELLOW}╠══════════════════════════════════════════════════════════════╣${NC}"
-    echo -e "${YELLOW}║  OPCIÓN 2: BÁSICO (1 GB RAM) - Recomendado DigitalOcean \$6  ║${NC}"
-    echo -e "${YELLOW}║  • 1 GB RAM / 1 CPU                                          ║${NC}"
-    echo -e "${YELLOW}║  • 25 GB SSD                                                 ║${NC}"
-    echo -e "${YELLOW}║  • Swap: 2GB, Workers: 0, Límites moderados                  ║${NC}"
-    echo -e "${BOLD}${YELLOW}╠══════════════════════════════════════════════════════════════╣${NC}"
-    echo -e "${YELLOW}║  OPCIÓN 3: ESTÁNDAR (2 GB+ RAM) - DigitalOcean \$12+         ║${NC}"
+    echo -e "${YELLOW}║  OPCIÓN 2: ESTÁNDAR (2 GB+ RAM) - DigitalOcean \$12+         ║${NC}"
     echo -e "${YELLOW}║  • 2 GB+ RAM / 1+ CPU                                        ║${NC}"
     echo -e "${YELLOW}║  • 50 GB+ SSD                                                ║${NC}"
-    echo -e "${YELLOW}║  • Swap: 2GB, Workers: 2, Límites normales                   ║${NC}"
+    echo -e "${YELLOW}║  • Swap: 2GB, Workers: 2, Configuración normal               ║${NC}"
     echo -e "${BOLD}${YELLOW}╚══════════════════════════════════════════════════════════════╝${NC}"
     echo
     
@@ -668,39 +594,31 @@ select_resource_profile() {
     local recommended="1"
     
     if [ "$total_ram_mb" -ge 1800 ]; then
-        recommended="3"
-        echo -e "${CYAN}RAM detectada: ${WHITE}${total_ram_mb} MB${NC} - Recomendado: ${GREEN}Opción 3 (Estándar)${NC}"
-    elif [ "$total_ram_mb" -ge 900 ]; then
         recommended="2"
-        echo -e "${CYAN}RAM detectada: ${WHITE}${total_ram_mb} MB${NC} - Recomendado: ${GREEN}Opción 2 (Básico)${NC}"
+        echo -e "${CYAN}RAM detectada: ${WHITE}${total_ram_mb} MB${NC} - Recomendado: ${GREEN}Opción 2 (Estándar)${NC}"
     else
         recommended="1"
-        echo -e "${CYAN}RAM detectada: ${WHITE}${total_ram_mb} MB${NC} - Recomendado: ${GREEN}Opción 1 (Mínimo)${NC}"
+        echo -e "${CYAN}RAM detectada: ${WHITE}${total_ram_mb} MB${NC} - Recomendado: ${GREEN}Opción 1 (Básico)${NC}"
     fi
     echo
     
     while true; do
-        echo -e -n "${BOLD}${WHITE}Selecciona perfil [1-3] (default: $recommended): ${NC}"
+        echo -e -n "${BOLD}${WHITE}Selecciona perfil [1-2] (por defecto: $recommended): ${NC}"
         read -r profile_choice
         
         case "${profile_choice:-$recommended}" in
             1)
-                RESOURCE_PROFILE="minimal"
-                configure_minimal_profile
-                break
-                ;;
-            2)
                 RESOURCE_PROFILE="basic"
                 configure_basic_profile
                 break
                 ;;
-            3)
+            2)
                 RESOURCE_PROFILE="standard"
                 configure_standard_profile
                 break
                 ;;
             *)
-                echo -e "${RED}Opción inválida. Selecciona 1, 2 o 3.${NC}"
+                echo -e "${RED}Opción inválida. Selecciona 1 o 2.${NC}"
                 ;;
         esac
     done
@@ -710,54 +628,29 @@ select_resource_profile() {
     log_message "INFO" "Resource profile selected: $RESOURCE_PROFILE"
 }
 
-# Profile: MINIMAL (512 MB RAM) - Most aggressive optimizations
-configure_minimal_profile() {
-    echo -e "${CYAN}Configurando perfil MÍNIMO (512 MB RAM)...${NC}"
-    
-    # Swap - Critical for 512MB
-    SWAP_SIZE="3G"  # 3GB swap to compensate very low RAM
-    
-    # Odoo settings - Ultra conservative
-    WORKERS=0                      # No workers, threaded mode only
-    MAX_CRON_THREADS=1             # Single cron thread
-    LIMIT_MEMORY_HARD=536870912    # 512MB hard limit per worker
-    LIMIT_MEMORY_SOFT=402653184    # 384MB soft limit
-    LIMIT_TIME_CPU=60              # 60 seconds CPU time
-    LIMIT_TIME_REAL=120            # 120 seconds real time
-    LIMIT_REQUEST=1024             # Recycle after 1024 requests
-    
-    # PostgreSQL - Minimal memory
-    PG_SHARED_BUFFERS="16MB"
-    PG_EFFECTIVE_CACHE="48MB"
-    PG_WORK_MEM="1MB"
-    PG_MAINTENANCE_WORK_MEM="8MB"
-    
-    log_message "INFO" "Minimal profile configured for 512MB RAM"
-}
-
-# Profile: BASIC (1 GB RAM) - Balanced optimizations
+# Profile: BASIC (900 MB+ RAM) - Optimizado para bajos recursos
 configure_basic_profile() {
-    echo -e "${CYAN}Configurando perfil BÁSICO (1 GB RAM)...${NC}"
+    echo -e "${CYAN}Configurando perfil BÁSICO (900 MB+ RAM)...${NC}"
     
-    # Swap
+    # Swap - Importante para compensar RAM limitada
     SWAP_SIZE="2G"  # 2GB swap
     
-    # Odoo settings - Conservative
-    WORKERS=0                       # Threaded mode (safer for 1GB)
-    MAX_CRON_THREADS=1              # Single cron thread
-    LIMIT_MEMORY_HARD=1073741824    # 1GB hard limit
-    LIMIT_MEMORY_SOFT=805306368     # 768MB soft limit
-    LIMIT_TIME_CPU=120              # 120 seconds CPU time
-    LIMIT_TIME_REAL=240             # 240 seconds real time
-    LIMIT_REQUEST=2048              # Recycle after 2048 requests
+    # Odoo settings - Optimizado para 900MB+
+    WORKERS=0                       # Modo thread (más seguro para RAM limitada)
+    MAX_CRON_THREADS=1              # 1 hilo cron
+    LIMIT_MEMORY_HARD=1073741824    # 1GB límite máximo
+    LIMIT_MEMORY_SOFT=805306368     # 768MB límite suave
+    LIMIT_TIME_CPU=120              # 120 segundos tiempo CPU
+    LIMIT_TIME_REAL=240             # 240 segundos tiempo real
+    LIMIT_REQUEST=2048              # Reciclar después de 2048 solicitudes
     
-    # PostgreSQL - Low memory
+    # PostgreSQL - Memoria baja
     PG_SHARED_BUFFERS="32MB"
     PG_EFFECTIVE_CACHE="128MB"
     PG_WORK_MEM="2MB"
     PG_MAINTENANCE_WORK_MEM="16MB"
     
-    log_message "INFO" "Basic profile configured for 1GB RAM"
+    log_message "INFO" "Basic profile configured for 900MB+ RAM"
 }
 
 # Profile: STANDARD (2 GB+ RAM) - Normal optimizations
