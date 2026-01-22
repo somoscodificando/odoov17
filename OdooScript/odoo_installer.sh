@@ -89,14 +89,25 @@ CUSTOM_MODULE_REPOS=(
     # Para repo público usar: "https://github.com/somoscodificando/modulos.git|17.0"
 )
 
-# Low Resource Optimizations
-SWAP_SIZE="2G"  # 2GB swap for 1GB RAM servers
-WORKERS=0       # 0 = automatic (recommended for low RAM)
+# Server Resource Profile (will be set during configuration)
+# Options: "minimal" (512MB), "basic" (1GB), "standard" (2GB+)
+RESOURCE_PROFILE="minimal"
+
+# Resource-specific configurations (will be set based on profile)
+SWAP_SIZE="2G"
+WORKERS=0
 MAX_CRON_THREADS=1
-LIMIT_MEMORY_HARD=2684354560  # ~2.5GB
-LIMIT_MEMORY_SOFT=2147483648  # 2GB
-LIMIT_TIME_CPU=600
-LIMIT_TIME_REAL=1200
+LIMIT_MEMORY_HARD=1073741824   # Will be adjusted per profile
+LIMIT_MEMORY_SOFT=805306368    # Will be adjusted per profile
+LIMIT_TIME_CPU=120
+LIMIT_TIME_REAL=240
+LIMIT_REQUEST=2048
+
+# PostgreSQL optimization level
+PG_SHARED_BUFFERS="32MB"
+PG_EFFECTIVE_CACHE="64MB"
+PG_WORK_MEM="2MB"
+PG_MAINTENANCE_WORK_MEM="16MB"
 
 # Trap for cleanup on exit
 trap cleanup_on_exit EXIT INT TERM
@@ -606,12 +617,160 @@ select_odoo_version() {
     return 0
 }
 
+# Select server resource profile and configure optimizations
+select_resource_profile() {
+    clear
+    display_billboard "Server Resource Profile"
+    
+    echo -e "${BOLD}${WHITE}🖥️ Selecciona el perfil de recursos de tu servidor:${NC}"
+    echo
+    echo -e "${BOLD}${YELLOW}╔══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${YELLOW}║  OPCIÓN 1: MÍNIMO (512 MB RAM) - Recomendado DigitalOcean \$4 ║${NC}"
+    echo -e "${YELLOW}║  • 512 MB RAM / 1 CPU                                        ║${NC}"
+    echo -e "${YELLOW}║  • 10 GB SSD                                                 ║${NC}"
+    echo -e "${YELLOW}║  • Swap: 2GB, Workers: 0, Límites muy estrictos              ║${NC}"
+    echo -e "${BOLD}${YELLOW}╠══════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${YELLOW}║  OPCIÓN 2: BÁSICO (1 GB RAM) - Recomendado DigitalOcean \$6  ║${NC}"
+    echo -e "${YELLOW}║  • 1 GB RAM / 1 CPU                                          ║${NC}"
+    echo -e "${YELLOW}║  • 25 GB SSD                                                 ║${NC}"
+    echo -e "${YELLOW}║  • Swap: 2GB, Workers: 0, Límites moderados                  ║${NC}"
+    echo -e "${BOLD}${YELLOW}╠══════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${YELLOW}║  OPCIÓN 3: ESTÁNDAR (2 GB+ RAM) - DigitalOcean \$12+         ║${NC}"
+    echo -e "${YELLOW}║  • 2 GB+ RAM / 1+ CPU                                        ║${NC}"
+    echo -e "${YELLOW}║  • 50 GB+ SSD                                                ║${NC}"
+    echo -e "${YELLOW}║  • Swap: 2GB, Workers: 2, Límites normales                   ║${NC}"
+    echo -e "${BOLD}${YELLOW}╚══════════════════════════════════════════════════════════════╝${NC}"
+    echo
+    
+    # Auto-detect RAM
+    local total_ram_mb=$(free -m | awk '/^Mem:/{print $2}')
+    local recommended="1"
+    
+    if [ "$total_ram_mb" -ge 1800 ]; then
+        recommended="3"
+        echo -e "${CYAN}RAM detectada: ${WHITE}${total_ram_mb} MB${NC} - Recomendado: ${GREEN}Opción 3 (Estándar)${NC}"
+    elif [ "$total_ram_mb" -ge 900 ]; then
+        recommended="2"
+        echo -e "${CYAN}RAM detectada: ${WHITE}${total_ram_mb} MB${NC} - Recomendado: ${GREEN}Opción 2 (Básico)${NC}"
+    else
+        recommended="1"
+        echo -e "${CYAN}RAM detectada: ${WHITE}${total_ram_mb} MB${NC} - Recomendado: ${GREEN}Opción 1 (Mínimo)${NC}"
+    fi
+    echo
+    
+    while true; do
+        echo -e -n "${BOLD}${WHITE}Selecciona perfil [1-3] (default: $recommended): ${NC}"
+        read -r profile_choice
+        
+        case "${profile_choice:-$recommended}" in
+            1)
+                RESOURCE_PROFILE="minimal"
+                configure_minimal_profile
+                break
+                ;;
+            2)
+                RESOURCE_PROFILE="basic"
+                configure_basic_profile
+                break
+                ;;
+            3)
+                RESOURCE_PROFILE="standard"
+                configure_standard_profile
+                break
+                ;;
+            *)
+                echo -e "${RED}Opción inválida. Selecciona 1, 2 o 3.${NC}"
+                ;;
+        esac
+    done
+    
+    echo
+    echo -e "${GREEN}✓ Perfil configurado: $RESOURCE_PROFILE${NC}"
+    log_message "INFO" "Resource profile selected: $RESOURCE_PROFILE"
+}
+
+# Profile: MINIMAL (512 MB RAM) - Most aggressive optimizations
+configure_minimal_profile() {
+    echo -e "${CYAN}Configurando perfil MÍNIMO (512 MB RAM)...${NC}"
+    
+    # Swap - Critical for 512MB
+    SWAP_SIZE="3G"  # 3GB swap to compensate very low RAM
+    
+    # Odoo settings - Ultra conservative
+    WORKERS=0                      # No workers, threaded mode only
+    MAX_CRON_THREADS=1             # Single cron thread
+    LIMIT_MEMORY_HARD=536870912    # 512MB hard limit per worker
+    LIMIT_MEMORY_SOFT=402653184    # 384MB soft limit
+    LIMIT_TIME_CPU=60              # 60 seconds CPU time
+    LIMIT_TIME_REAL=120            # 120 seconds real time
+    LIMIT_REQUEST=1024             # Recycle after 1024 requests
+    
+    # PostgreSQL - Minimal memory
+    PG_SHARED_BUFFERS="16MB"
+    PG_EFFECTIVE_CACHE="48MB"
+    PG_WORK_MEM="1MB"
+    PG_MAINTENANCE_WORK_MEM="8MB"
+    
+    log_message "INFO" "Minimal profile configured for 512MB RAM"
+}
+
+# Profile: BASIC (1 GB RAM) - Balanced optimizations
+configure_basic_profile() {
+    echo -e "${CYAN}Configurando perfil BÁSICO (1 GB RAM)...${NC}"
+    
+    # Swap
+    SWAP_SIZE="2G"  # 2GB swap
+    
+    # Odoo settings - Conservative
+    WORKERS=0                       # Threaded mode (safer for 1GB)
+    MAX_CRON_THREADS=1              # Single cron thread
+    LIMIT_MEMORY_HARD=1073741824    # 1GB hard limit
+    LIMIT_MEMORY_SOFT=805306368     # 768MB soft limit
+    LIMIT_TIME_CPU=120              # 120 seconds CPU time
+    LIMIT_TIME_REAL=240             # 240 seconds real time
+    LIMIT_REQUEST=2048              # Recycle after 2048 requests
+    
+    # PostgreSQL - Low memory
+    PG_SHARED_BUFFERS="32MB"
+    PG_EFFECTIVE_CACHE="128MB"
+    PG_WORK_MEM="2MB"
+    PG_MAINTENANCE_WORK_MEM="16MB"
+    
+    log_message "INFO" "Basic profile configured for 1GB RAM"
+}
+
+# Profile: STANDARD (2 GB+ RAM) - Normal optimizations
+configure_standard_profile() {
+    echo -e "${CYAN}Configurando perfil ESTÁNDAR (2 GB+ RAM)...${NC}"
+    
+    # Swap
+    SWAP_SIZE="2G"  # 2GB swap
+    
+    # Odoo settings - Normal
+    WORKERS=2                       # 2 workers
+    MAX_CRON_THREADS=2              # 2 cron threads
+    LIMIT_MEMORY_HARD=2684354560    # 2.5GB hard limit
+    LIMIT_MEMORY_SOFT=2147483648    # 2GB soft limit
+    LIMIT_TIME_CPU=600              # 600 seconds CPU time
+    LIMIT_TIME_REAL=1200            # 1200 seconds real time
+    LIMIT_REQUEST=8192              # Recycle after 8192 requests
+    
+    # PostgreSQL - Normal memory
+    PG_SHARED_BUFFERS="128MB"
+    PG_EFFECTIVE_CACHE="512MB"
+    PG_WORK_MEM="4MB"
+    PG_MAINTENANCE_WORK_MEM="64MB"
+    
+    log_message "INFO" "Standard profile configured for 2GB+ RAM"
+}
+
 confirm_installation() {
     clear
     display_billboard "Installation Confirmation"
     
     echo -e "${BOLD}${WHITE}Installation Summary:${NC}"
     echo -e "  ${CYAN}Odoo Version:${NC} $OE_BRANCH (Community)"
+    echo -e "  ${CYAN}Resource Profile:${NC} $RESOURCE_PROFILE"
     echo -e "  ${CYAN}System User:${NC} $OE_USER"
     echo -e "  ${CYAN}Domain:${NC} ${DOMAIN_NAME:-"IP-based access"}"
     echo -e "  ${CYAN}Install Nginx:${NC} $INSTALL_NGINX"
@@ -634,13 +793,15 @@ confirm_installation() {
             echo -e "    ${WHITE}• ${repo%%|*}${NC}"
         done
     fi
-    echo -e "  ${CYAN}Swap Size:${NC} $SWAP_SIZE (for low RAM optimization)"
     echo
-    echo -e "${YELLOW}${BOLD}OPTIMIZATIONS FOR LOW RESOURCES:${NC}"
-    echo -e "  • Swap memory: $SWAP_SIZE"
-    echo -e "  • Workers: $WORKERS (auto-adjusted)"
-    echo -e "  • Max cron threads: $MAX_CRON_THREADS"
-    echo -e "  • Memory limits configured for 1GB RAM"
+    echo -e "${YELLOW}${BOLD}⚡ OPTIMIZACIONES PARA PERFIL: ${RESOURCE_PROFILE^^}${NC}"
+    echo -e "  ${CYAN}Swap:${NC} $SWAP_SIZE"
+    echo -e "  ${CYAN}Workers:${NC} $WORKERS"
+    echo -e "  ${CYAN}Cron Threads:${NC} $MAX_CRON_THREADS"
+    echo -e "  ${CYAN}Memory Hard Limit:${NC} $(( LIMIT_MEMORY_HARD / 1048576 )) MB"
+    echo -e "  ${CYAN}Memory Soft Limit:${NC} $(( LIMIT_MEMORY_SOFT / 1048576 )) MB"
+    echo -e "  ${CYAN}PostgreSQL Shared Buffers:${NC} $PG_SHARED_BUFFERS"
+    echo -e "  ${CYAN}PostgreSQL Effective Cache:${NC} $PG_EFFECTIVE_CACHE"
     echo
     
     while true; do
@@ -808,7 +969,7 @@ step_database_setup() {
 }
 
 optimize_postgresql() {
-    echo -e "${CYAN}Optimizing PostgreSQL for low memory...${NC}"
+    echo -e "${CYAN}Optimizing PostgreSQL for profile: $RESOURCE_PROFILE...${NC}"
     
     local pg_conf=$(find /etc/postgresql -name "postgresql.conf" 2>/dev/null | head -1)
     
@@ -816,22 +977,30 @@ optimize_postgresql() {
         # Backup original
         cp "$pg_conf" "${pg_conf}.backup"
         
-        # Apply low-memory optimizations
+        # Set max_connections based on profile
+        local max_conn=50
+        case "$RESOURCE_PROFILE" in
+            "minimal") max_conn=20;;
+            "basic") max_conn=30;;
+            "standard") max_conn=50;;
+        esac
+        
+        # Apply profile-specific optimizations
         cat >> "$pg_conf" << EOF
 
-# Optimizations for low memory (1GB RAM)
-shared_buffers = 128MB
-effective_cache_size = 256MB
-maintenance_work_mem = 32MB
-work_mem = 4MB
-max_connections = 50
+# Optimizations for profile: $RESOURCE_PROFILE
+shared_buffers = $PG_SHARED_BUFFERS
+effective_cache_size = $PG_EFFECTIVE_CACHE
+maintenance_work_mem = $PG_MAINTENANCE_WORK_MEM
+work_mem = $PG_WORK_MEM
+max_connections = $max_conn
 checkpoint_completion_target = 0.9
 wal_buffers = 4MB
 random_page_cost = 1.1
 EOF
         
         execute_simple "systemctl restart postgresql" "Restarting PostgreSQL with optimizations"
-        log_message "INFO" "PostgreSQL optimized for low memory"
+        log_message "INFO" "PostgreSQL optimized for profile: $RESOURCE_PROFILE"
     else
         log_message "WARNING" "Could not find PostgreSQL configuration file"
     fi
@@ -922,7 +1091,7 @@ step_odoo_configuration() {
     cat > /etc/odoo/odoo.conf << EOF
 [options]
 ; ============================================================================
-; Odoo Configuration - Optimized for Low Resources (1GB RAM)
+; Odoo Configuration - Profile: $RESOURCE_PROFILE
 ; Generated by CODIFICANDO Installer v$SCRIPT_VERSION
 ; ============================================================================
 
@@ -947,14 +1116,14 @@ log_handler = :WARNING
 ; Security
 admin_passwd = $DB_ADMIN_PASSWORD
 
-; Performance - Optimized for 1GB RAM
+; Performance - Optimized for profile: $RESOURCE_PROFILE
 workers = $WORKERS
 max_cron_threads = $MAX_CRON_THREADS
 limit_memory_hard = $LIMIT_MEMORY_HARD
 limit_memory_soft = $LIMIT_MEMORY_SOFT
 limit_time_cpu = $LIMIT_TIME_CPU
 limit_time_real = $LIMIT_TIME_REAL
-limit_request = 8192
+limit_request = $LIMIT_REQUEST
 
 ; Proxy Mode (for Nginx)
 proxy_mode = True
@@ -1218,10 +1387,29 @@ EOF
 step_service_final_setup() {
     show_step_header 10 "Final Setup" "Starting services and creating database"
     
+    # Set systemd memory limits based on profile
+    local memory_max="1G"
+    local memory_high="768M"
+    
+    case "$RESOURCE_PROFILE" in
+        "minimal")
+            memory_max="400M"
+            memory_high="350M"
+            ;;
+        "basic")
+            memory_max="800M"
+            memory_high="650M"
+            ;;
+        "standard")
+            memory_max="2G"
+            memory_high="1500M"
+            ;;
+    esac
+    
     # Create Odoo service file
     cat > /etc/systemd/system/odoo.service << EOF
 [Unit]
-Description=Odoo - CODIFICANDO Edition
+Description=Odoo - CODIFICANDO Edition ($RESOURCE_PROFILE profile)
 Documentation=http://www.odoo.com
 Requires=postgresql.service
 After=postgresql.service network.target
@@ -1236,9 +1424,9 @@ StandardOutput=journal+console
 Restart=on-failure
 RestartSec=5
 
-# Memory limits for low resource servers
-MemoryMax=1G
-MemoryHigh=768M
+# Memory limits for profile: $RESOURCE_PROFILE
+MemoryMax=$memory_max
+MemoryHigh=$memory_high
 
 [Install]
 WantedBy=multi-user.target
@@ -1588,6 +1776,7 @@ echo -e "  • Nginx with SSL"
 echo
 
 # Run configuration steps
+select_resource_profile    # NEW: Select server resources first
 select_odoo_version
 configure_domain
 configure_sendgrid
