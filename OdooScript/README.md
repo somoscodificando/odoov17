@@ -1,6 +1,6 @@
 # Enhanced Odoo Installer
 
-[![Version](https://img.shields.io/badge/Version-3.2.0--20260122-blue.svg)](https://github.com/somoscodificando/odoov17)
+[![Version](https://img.shields.io/badge/Version-3.2.1--20260122-blue.svg)](https://github.com/somoscodificando/odoov17)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Ubuntu](https://img.shields.io/badge/Ubuntu-22.04%20LTS-orange.svg)](https://ubuntu.com/)
 [![Odoo](https://img.shields.io/badge/Odoo-14.0%20to%2018.0-purple.svg)](https://www.odoo.com/)
@@ -9,9 +9,11 @@
 
 > **Professional Odoo installation script with domain configuration, official Nginx, SSL certificates, and dynamic configuration generation for Ubuntu 22.04**
 
-## 📦 Versión Actual: `3.2.0-20260122`
+## 📦 Versión Actual: `3.2.1-20260122`
 
 **Cambios en esta versión:**
+- ✅ Credenciales personalizadas: contacto@sistemascodificando.com / @Multiboot97
+- ✅ Módulos actualizados: pos, stock, purchase, account, sale
 - ✅ Eliminado perfil mínimo (512 MB) - Requiere 900 MB+ ahora
 - ✅ Simplificado a 2 perfiles: Básico (900 MB+) y Estándar (2 GB+)
 - ✅ SendGrid: Ingreso directo de API Key (sin configuración previa)
@@ -20,7 +22,7 @@
 **Verificar versión instalada:**
 ```bash
 head -10 odoo_installer.sh | grep "Version"
-# Debe mostrar: Version: 3.2.0-20260122
+# Debe mostrar: Version: 3.2.1-20260122
 ```
 
 ## 🚀 Quick Start
@@ -169,24 +171,25 @@ Path [/opt/extra-addons]: /opt/extra-addons
 ╔══════════════════════════════════════════════════════════════╗
 ║               MÓDULOS POR DEFECTO A INSTALAR                 ║
 ╠══════════════════════════════════════════════════════════════╣
-║  Módulos: sale,purchase,stock,account,crm                    ║
+║  Módulos: pos,stock,purchase,account,sale                ║
 ╚══════════════════════════════════════════════════════════════╝
 
 ¿Instalar módulos por defecto? [Y/n]: Y
-✓ Se instalarán: sale,purchase,stock,account,crm
+✓ Se instalarán: pos,stock,purchase,account,sale
 ```
 
 **Módulos disponibles por defecto:**
-| Módulo | Descripción |
-|--------|-------------|
-| `sale` | Ventas |
-| `purchase` | Compras |
-| `stock` | Inventario |
-| `account` | Contabilidad |
-| `crm` | CRM (Gestión de clientes) |
-| `project` | Proyectos |
-| `hr` | Recursos Humanos |
-| `website` | Sitio Web |
+| Módulo | Descripción | Instalado por defecto |
+|--------|-------------|-----------------------|
+| `pos` | Punto de Venta | ✅ |
+| `stock` | Inventario | ✅ |
+| `purchase` | Compras | ✅ |
+| `account` | Contabilidad | ✅ |
+| `sale` | Ventas | ✅ |
+| `crm` | CRM (Gestión de clientes) | ❌ |
+| `project` | Proyectos | ❌ |
+| `hr` | Recursos Humanos | ❌ |
+| `website` | Sitio Web | ❌ |
 
 #### 4.5 Confirmación
 ```
@@ -220,8 +223,8 @@ Una vez completado:
 **Credenciales iniciales de Odoo**:
 | Campo | Valor |
 |-------|-------|
-| Usuario | `admin` |
-| Contraseña | `admin` ⚠️ **¡Cambiar inmediatamente!** |
+| Usuario | `contacto@sistemascodificando.com` |
+| Contraseña | `@Multiboot97` ⚠️ **¡Cambiar inmediatamente!** |
 
 **Credenciales SendGrid (pre-configuradas)**:
 | Campo | Valor |
@@ -237,7 +240,7 @@ Una vez completado:
 1. **Cambiar contraseña de admin** (¡Muy importante!)
 2. **Configurar datos de empresa**
 3. **Verificar envío de emails** (ya configurado con SendGrid)
-4. **Los módulos ya están instalados** (sale, purchase, stock, account, crm)
+4. **Los módulos ya están instalados** (pos, stock, purchase, account, sale)
 
 ---
 

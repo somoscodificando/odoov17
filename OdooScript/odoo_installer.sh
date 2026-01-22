@@ -3,7 +3,7 @@
 # ===============================================================================
 # Enhanced Odoo Installation Script for Ubuntu 22.04 - OPTIMIZED for Low Resources
 # ===============================================================================
-# Version: 3.2.0-20260122
+# Version: 3.2.1-20260122
 # Release Date: 2026-01-22
 # Author: Mahmoud Abel Latif, https://mah007.net
 # Modified: CODIFICANDO - Optimized for DigitalOcean Droplets
@@ -21,14 +21,15 @@
 #   - Memory optimization with swap configuration
 #   - SendGrid SMTP direct API Key configuration
 #   - Public links configuration (proxy_mode, web.base.url)
-#   - Default database "CODIFICANDO" creation
+#   - Default database "CODIFICANDO" creation with custom credentials
 #   - Extra addons directory at /opt/extra-addons
 #   - Custom module repository cloning
 #   - Spanish interface for better user experience
+#   - Default modules: pos, stock, purchase, account, sale
 # ===============================================================================
 
 # Script configuration
-SCRIPT_VERSION="3.2.0-20260122"
+SCRIPT_VERSION="3.2.1-20260122"
 SCRIPT_NAME="Odoo Installer - CODIFICANDO Edition"
 LOG_FILE="/tmp/odoo_install_$(date +%Y%m%d_%H%M%S).log"
 CONFIG_FILE="/tmp/odoo_install_config.conf"
