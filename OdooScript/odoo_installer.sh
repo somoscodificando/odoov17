@@ -579,16 +579,19 @@ select_resource_profile() {
     echo -e "${BOLD}${WHITE}🖥️ Selecciona el perfil de recursos de tu servidor:${NC}"
     echo
     echo -e "${BOLD}${YELLOW}╔══════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${YELLOW}║  OPCIÓN 1: BÁSICO (900 MB+ RAM) - DigitalOcean \$6           ║${NC}"
-    echo -e "${YELLOW}║  • 900 MB+ RAM / 1 CPU                                       ║${NC}"
-    echo -e "${YELLOW}║  • 8 GB SSD (mínimo requerido)                               ║${NC}"
-    echo -e "${YELLOW}║  • Swap: 2GB, Workers: 0, Optimizado para bajos recursos     ║${NC}"
+    echo -e "${YELLOW}║  OPCIÓN 1: BÁSICO (1 GB RAM) - DigitalOcean \$6              ║${NC}"
+    echo -e "${YELLOW}║  • 1 GB RAM / 1 vCPU                                         ║${NC}"
+    echo -e "${YELLOW}║  • 25 GB SSD                                                 ║${NC}"
+    echo -e "${YELLOW}║  • Swap: 2GB, Workers: 2 (POS Restaurante compatible)        ║${NC}"
+    echo -e "${YELLOW}║  • Límites de memoria reducidos para 1GB                     ║${NC}"
     echo -e "${BOLD}${YELLOW}╠══════════════════════════════════════════════════════════════╣${NC}"
     echo -e "${YELLOW}║  OPCIÓN 2: ESTÁNDAR (2 GB+ RAM) - DigitalOcean \$12+         ║${NC}"
-    echo -e "${YELLOW}║  • 2 GB+ RAM / 1+ CPU                                        ║${NC}"
+    echo -e "${YELLOW}║  • 2 GB+ RAM / 1+ vCPU                                       ║${NC}"
     echo -e "${YELLOW}║  • 50 GB+ SSD                                                ║${NC}"
     echo -e "${YELLOW}║  • Swap: 2GB, Workers: 2, Configuración normal               ║${NC}"
     echo -e "${BOLD}${YELLOW}╚══════════════════════════════════════════════════════════════╝${NC}"
+    echo
+    echo -e "${GREEN}✓ Ambos perfiles soportan POS Restaurante con WebSocket${NC}"
     echo
     
     # Auto-detect RAM
@@ -630,31 +633,41 @@ select_resource_profile() {
     log_message "INFO" "Resource profile selected: $RESOURCE_PROFILE"
 }
 
-# Profile: BASIC (900 MB+ RAM) - Optimizado para bajos recursos
+# Profile: BASIC (1 GB RAM) - Optimizado para bajos recursos + POS Restaurante
 # NOTA: workers=2 mínimo requerido para POS Restaurante (websocket/tiempo real)
+# IMPORTANTE: Con 1GB RAM + 2GB Swap, Odoo funciona con POS Restaurante
 configure_basic_profile() {
-    echo -e "${CYAN}Configurando perfil BÁSICO (900 MB+ RAM)...${NC}"
+    echo -e "${CYAN}Configurando perfil BÁSICO (1 GB RAM)...${NC}"
     
-    # Swap - Importante para compensar RAM limitada
-    SWAP_SIZE="2G"  # 2GB swap
+    # Swap - CRÍTICO para 1GB RAM (compensa RAM limitada)
+    SWAP_SIZE="2G"  # 2GB swap - obligatorio para 1GB RAM
     
-    # Odoo settings - Optimizado para 900MB+
-    # IMPORTANTE: workers=2 es el mínimo para POS Restaurante (websocket requiere gevent)
+    # =========================================================================
+    # Odoo settings - Optimizado para 1GB RAM + POS Restaurante
+    # =========================================================================
+    # workers=2: Mínimo para WebSocket/gevent (POS Restaurante tiempo real)
+    # Cada worker usa ~100-150MB RAM, con 2 workers + cron ~300-400MB para Odoo
+    # PostgreSQL usa ~100-150MB, Nginx ~20MB, Sistema ~200MB
+    # Total: ~700-800MB RAM física, resto usa swap
+    # =========================================================================
     WORKERS=2                       # Mínimo 2 para POS Restaurante (tiempo real)
-    MAX_CRON_THREADS=1              # 1 hilo cron
-    LIMIT_MEMORY_HARD=1073741824    # 1GB límite máximo
-    LIMIT_MEMORY_SOFT=805306368     # 768MB límite suave
-    LIMIT_TIME_CPU=120              # 120 segundos tiempo CPU
-    LIMIT_TIME_REAL=240             # 240 segundos tiempo real
+    MAX_CRON_THREADS=1              # 1 hilo cron (reduce memoria)
+    
+    # Límites de memoria POR WORKER (reducidos para 1GB)
+    LIMIT_MEMORY_HARD=536870912     # 512MB límite máximo por worker
+    LIMIT_MEMORY_SOFT=419430400     # 400MB límite suave por worker
+    LIMIT_TIME_CPU=60               # 60 segundos tiempo CPU (reducido)
+    LIMIT_TIME_REAL=120             # 120 segundos tiempo real (reducido)
     LIMIT_REQUEST=2048              # Reciclar después de 2048 solicitudes
     
-    # PostgreSQL - Memoria baja
-    PG_SHARED_BUFFERS="32MB"
-    PG_EFFECTIVE_CACHE="128MB"
-    PG_WORK_MEM="2MB"
-    PG_MAINTENANCE_WORK_MEM="16MB"
+    # PostgreSQL - Memoria mínima para 1GB
+    PG_SHARED_BUFFERS="32MB"        # Bajo para dejar RAM a Odoo
+    PG_EFFECTIVE_CACHE="128MB"      # Cache efectivo bajo
+    PG_WORK_MEM="2MB"               # Memoria de trabajo mínima
+    PG_MAINTENANCE_WORK_MEM="16MB"  # Mantenimiento bajo
+    PG_MAX_CONNECTIONS=20           # Conexiones limitadas
     
-    log_message "INFO" "Basic profile configured for 900MB+ RAM (workers=2 for POS)"
+    log_message "INFO" "Basic profile configured for 1GB RAM (workers=2 for POS Restaurante)"
 }
 
 # Profile: STANDARD (2 GB+ RAM) - Normal optimizations
@@ -678,6 +691,7 @@ configure_standard_profile() {
     PG_EFFECTIVE_CACHE="512MB"
     PG_WORK_MEM="4MB"
     PG_MAINTENANCE_WORK_MEM="64MB"
+    PG_MAX_CONNECTIONS=50           # Conexiones normales
     
     log_message "INFO" "Standard profile configured for 2GB+ RAM"
 }
@@ -898,18 +912,15 @@ optimize_postgresql() {
         # Backup original
         cp "$pg_conf" "${pg_conf}.backup"
         
-        # Set max_connections based on profile
-        local max_conn=50
-        case "$RESOURCE_PROFILE" in
-            "minimal") max_conn=20;;
-            "basic") max_conn=30;;
-            "standard") max_conn=50;;
-        esac
+        # Use PG_MAX_CONNECTIONS from profile (set in configure_*_profile functions)
+        local max_conn=${PG_MAX_CONNECTIONS:-50}
         
         # Apply profile-specific optimizations
         cat >> "$pg_conf" << EOF
 
-# Optimizations for profile: $RESOURCE_PROFILE
+# ============================================================================
+# PostgreSQL Optimizations for profile: $RESOURCE_PROFILE
+# ============================================================================
 shared_buffers = $PG_SHARED_BUFFERS
 effective_cache_size = $PG_EFFECTIVE_CACHE
 maintenance_work_mem = $PG_MAINTENANCE_WORK_MEM
@@ -921,7 +932,7 @@ random_page_cost = 1.1
 EOF
         
         execute_simple "systemctl restart postgresql" "Restarting PostgreSQL with optimizations"
-        log_message "INFO" "PostgreSQL optimized for profile: $RESOURCE_PROFILE"
+        log_message "INFO" "PostgreSQL optimized for profile: $RESOURCE_PROFILE (max_connections=$max_conn)"
     else
         log_message "WARNING" "Could not find PostgreSQL configuration file"
     fi
@@ -1382,17 +1393,16 @@ step_service_final_setup() {
     show_step_header 10 "Final Setup" "Starting services and creating database"
     
     # Set systemd memory limits based on profile
+    # NOTA: Con swap de 2GB, estos límites permiten que Odoo use swap si necesita más
     local memory_max="1G"
     local memory_high="768M"
     
     case "$RESOURCE_PROFILE" in
-        "minimal")
-            memory_max="400M"
-            memory_high="350M"
-            ;;
         "basic")
-            memory_max="800M"
-            memory_high="650M"
+            # Para 1GB RAM: Odoo puede usar hasta 700MB RAM, resto usa swap
+            # MemoryMax es límite absoluto, MemoryHigh es "preferido"
+            memory_max="700M"
+            memory_high="500M"
             ;;
         "standard")
             memory_max="2G"
