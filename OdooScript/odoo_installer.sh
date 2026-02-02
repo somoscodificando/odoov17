@@ -1160,6 +1160,15 @@ step_nginx_ssl_configuration() {
     # Install Nginx
     execute_simple "apt-get install -y nginx" "Installing Nginx"
     
+    # Stop nginx temporarily for clean configuration
+    systemctl stop nginx 2>/dev/null || true
+    
+    # Remove any existing configurations that might conflict
+    rm -f /etc/nginx/sites-enabled/default
+    rm -f /etc/nginx/sites-enabled/odoo
+    rm -f /etc/nginx/sites-enabled/odoo-temp
+    rm -f /etc/nginx/sites-available/odoo-temp
+    
     # Configure SSL
     if [ "$SSL_TYPE" = "letsencrypt" ] && [ "$HAS_DOMAIN" = "true" ]; then
         install_letsencrypt_ssl
@@ -1167,15 +1176,108 @@ step_nginx_ssl_configuration() {
         generate_self_signed_ssl
     fi
     
+    # Verify SSL certificates exist before creating config
+    verify_ssl_certificates
+    
     # Create Nginx configuration
     create_nginx_config
     
-    # Enable and start Nginx
+    # Enable and start Nginx with error handling
     execute_simple "systemctl enable nginx" "Enabling Nginx"
-    execute_simple "nginx -t" "Testing Nginx configuration"
-    execute_simple "systemctl restart nginx" "Starting Nginx"
+    
+    # Test nginx configuration and show errors if any
+    echo -e "${CYAN}Testing Nginx configuration...${NC}"
+    if nginx -t 2>&1 | tee -a "$LOG_FILE"; then
+        echo -e "${GREEN}✓ Nginx configuration is valid${NC}"
+    else
+        echo -e "${RED}✗ Nginx configuration has errors${NC}"
+        echo -e "${YELLOW}Showing Nginx error details:${NC}"
+        nginx -t 2>&1
+        log_message "ERROR" "Nginx configuration test failed"
+        
+        # Try to fix common issues
+        fix_nginx_config_issues
+    fi
+    
+    # Start Nginx
+    if systemctl start nginx 2>&1; then
+        echo -e "${GREEN}✓ Nginx started successfully${NC}"
+    else
+        echo -e "${RED}✗ Failed to start Nginx${NC}"
+        echo -e "${YELLOW}Check logs: journalctl -xeu nginx${NC}"
+        log_message "ERROR" "Failed to start Nginx"
+    fi
     
     log_message "INFO" "Nginx configuration completed"
+}
+
+# Verify SSL certificates exist
+verify_ssl_certificates() {
+    echo -e "${CYAN}Verifying SSL certificates...${NC}"
+    
+    local ssl_cert_path ssl_key_path
+    
+    if [ "$SSL_TYPE" = "letsencrypt" ]; then
+        ssl_cert_path="/etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem"
+        ssl_key_path="/etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem"
+    else
+        ssl_cert_path="/etc/ssl/nginx/server.crt"
+        ssl_key_path="/etc/ssl/nginx/server.key"
+    fi
+    
+    # Check if certificate files exist
+    if [ ! -f "$ssl_cert_path" ] || [ ! -f "$ssl_key_path" ]; then
+        echo -e "${YELLOW}⚠ SSL certificates not found at expected paths${NC}"
+        echo -e "${YELLOW}  Expected cert: $ssl_cert_path${NC}"
+        echo -e "${YELLOW}  Expected key: $ssl_key_path${NC}"
+        
+        # Fallback to self-signed if Let's Encrypt failed
+        if [ "$SSL_TYPE" = "letsencrypt" ]; then
+            echo -e "${YELLOW}Falling back to self-signed certificate...${NC}"
+            SSL_TYPE="self-signed"
+            generate_self_signed_ssl
+        fi
+    else
+        echo -e "${GREEN}✓ SSL certificates found${NC}"
+        log_message "INFO" "SSL certificates verified: $ssl_cert_path"
+    fi
+}
+
+# Try to fix common nginx configuration issues
+fix_nginx_config_issues() {
+    echo -e "${YELLOW}Attempting to fix Nginx configuration...${NC}"
+    
+    local ssl_cert_path ssl_key_path
+    
+    if [ "$SSL_TYPE" = "letsencrypt" ]; then
+        ssl_cert_path="/etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem"
+        ssl_key_path="/etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem"
+    else
+        ssl_cert_path="/etc/ssl/nginx/server.crt"
+        ssl_key_path="/etc/ssl/nginx/server.key"
+    fi
+    
+    # Check if SSL files don't exist - generate self-signed
+    if [ ! -f "$ssl_cert_path" ] || [ ! -f "$ssl_key_path" ]; then
+        echo -e "${YELLOW}SSL certificates missing - generating self-signed...${NC}"
+        SSL_TYPE="self-signed"
+        generate_self_signed_ssl
+        
+        # Recreate nginx config with self-signed paths
+        create_nginx_config
+        
+        # Test again
+        if nginx -t 2>&1; then
+            echo -e "${GREEN}✓ Fixed: Using self-signed certificate${NC}"
+        fi
+    fi
+    
+    # Check for duplicate upstream definitions
+    if grep -c "upstream odoo" /etc/nginx/sites-enabled/* 2>/dev/null | grep -q "2"; then
+        echo -e "${YELLOW}Found duplicate configs, cleaning...${NC}"
+        rm -f /etc/nginx/sites-enabled/odoo-temp
+        rm -f /etc/nginx/sites-enabled/default
+    fi
 }
 
 generate_self_signed_ssl() {
@@ -1197,32 +1299,82 @@ install_letsencrypt_ssl() {
     # Install certbot
     execute_simple "apt-get install -y certbot python3-certbot-nginx" "Installing Certbot"
     
-    # Create temporary nginx config for verification
+    # Clean any existing nginx configs that might interfere
+    rm -f /etc/nginx/sites-enabled/default
+    rm -f /etc/nginx/sites-enabled/odoo
+    rm -f /etc/nginx/sites-enabled/odoo-temp
+    
+    # Create temporary nginx config for verification (standalone mode is more reliable)
     cat > /etc/nginx/sites-available/odoo-temp << EOF
 server {
     listen 80;
     server_name $DOMAIN_NAME;
+    
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+    
     location / {
         return 200 'Temporary configuration for SSL setup';
+        add_header Content-Type text/plain;
     }
 }
 EOF
     
-    ln -sf /etc/nginx/sites-available/odoo-temp /etc/nginx/sites-enabled/
-    rm -f /etc/nginx/sites-enabled/default
-    systemctl restart nginx
+    ln -sf /etc/nginx/sites-available/odoo-temp /etc/nginx/sites-enabled/odoo-temp
     
-    # Get certificate
-    if certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos --email "admin@$DOMAIN_NAME" --redirect >> "$LOG_FILE" 2>&1; then
-        log_message "INFO" "Let's Encrypt certificate obtained"
+    # Create webroot directory
+    mkdir -p /var/www/html/.well-known/acme-challenge
+    
+    # Start nginx for certificate verification
+    systemctl start nginx 2>/dev/null || true
+    
+    # Wait for nginx to be ready
+    sleep 2
+    
+    # Try to get certificate using webroot method (more reliable than --nginx)
+    echo -e "${CYAN}Requesting Let's Encrypt certificate for $DOMAIN_NAME...${NC}"
+    
+    local certbot_success=false
+    
+    # Method 1: Try webroot (most reliable)
+    if certbot certonly --webroot -w /var/www/html -d "$DOMAIN_NAME" \
+        --non-interactive --agree-tos --email "admin@$DOMAIN_NAME" \
+        --no-eff-email >> "$LOG_FILE" 2>&1; then
+        certbot_success=true
+        echo -e "${GREEN}✓ Let's Encrypt certificate obtained (webroot method)${NC}"
+        log_message "INFO" "Let's Encrypt certificate obtained via webroot"
     else
-        log_message "WARNING" "Let's Encrypt failed, using self-signed"
+        echo -e "${YELLOW}Webroot method failed, trying standalone...${NC}"
+        
+        # Stop nginx for standalone method
+        systemctl stop nginx 2>/dev/null || true
+        
+        # Method 2: Try standalone
+        if certbot certonly --standalone -d "$DOMAIN_NAME" \
+            --non-interactive --agree-tos --email "admin@$DOMAIN_NAME" \
+            --no-eff-email >> "$LOG_FILE" 2>&1; then
+            certbot_success=true
+            echo -e "${GREEN}✓ Let's Encrypt certificate obtained (standalone method)${NC}"
+            log_message "INFO" "Let's Encrypt certificate obtained via standalone"
+        fi
+    fi
+    
+    # Stop nginx and clean temp config
+    systemctl stop nginx 2>/dev/null || true
+    rm -f /etc/nginx/sites-available/odoo-temp
+    rm -f /etc/nginx/sites-enabled/odoo-temp
+    
+    # Verify certificate was actually created
+    if [ "$certbot_success" = true ] && [ -f "/etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem" ]; then
+        echo -e "${GREEN}✓ SSL certificate verified at /etc/letsencrypt/live/$DOMAIN_NAME/${NC}"
+        log_message "INFO" "Let's Encrypt certificate verified"
+    else
+        echo -e "${YELLOW}⚠ Let's Encrypt certificate not found, using self-signed${NC}"
+        log_message "WARNING" "Let's Encrypt failed, falling back to self-signed"
         SSL_TYPE="self-signed"
         generate_self_signed_ssl
     fi
-    
-    # Remove temporary config
-    rm -f /etc/nginx/sites-available/odoo-temp /etc/nginx/sites-enabled/odoo-temp
 }
 
 create_nginx_config() {
