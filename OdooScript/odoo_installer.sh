@@ -1185,27 +1185,44 @@ step_nginx_ssl_configuration() {
     # Enable and start Nginx with error handling
     execute_simple "systemctl enable nginx" "Enabling Nginx"
     
-    # Test nginx configuration and show errors if any
+    # Test nginx configuration - CRÍTICO: no reiniciar si falla
     echo -e "${CYAN}Testing Nginx configuration...${NC}"
-    if nginx -t 2>&1 | tee -a "$LOG_FILE"; then
-        echo -e "${GREEN}✓ Nginx configuration is valid${NC}"
-    else
-        echo -e "${RED}✗ Nginx configuration has errors${NC}"
-        echo -e "${YELLOW}Showing Nginx error details:${NC}"
-        nginx -t 2>&1
-        log_message "ERROR" "Nginx configuration test failed"
-        
-        # Try to fix common issues
-        fix_nginx_config_issues
-    fi
+    local nginx_test_output
+    nginx_test_output=$(nginx -t 2>&1)
+    local nginx_test_result=$?
     
-    # Start Nginx
-    if systemctl start nginx 2>&1; then
-        echo -e "${GREEN}✓ Nginx started successfully${NC}"
+    echo "$nginx_test_output" >> "$LOG_FILE"
+    
+    if [ $nginx_test_result -eq 0 ]; then
+        echo -e "${GREEN}✓ Nginx configuration is valid${NC}"
+        echo "$nginx_test_output"
+        
+        # Start Nginx solo si la configuración es válida
+        if systemctl start nginx 2>&1; then
+            echo -e "${GREEN}✓ Nginx started successfully${NC}"
+        else
+            echo -e "${RED}✗ Failed to start Nginx${NC}"
+            echo -e "${YELLOW}Check logs: journalctl -xeu nginx${NC}"
+            log_message "ERROR" "Failed to start Nginx"
+        fi
     else
-        echo -e "${RED}✗ Failed to start Nginx${NC}"
-        echo -e "${YELLOW}Check logs: journalctl -xeu nginx${NC}"
-        log_message "ERROR" "Failed to start Nginx"
+        echo -e "${RED}✗ Nginx configuration has errors - NO SE REINICIARÁ NGINX${NC}"
+        echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+        echo -e "${YELLOW}ERROR DE NGINX -t:${NC}"
+        echo "$nginx_test_output"
+        echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+        echo -e "${YELLOW}Archivo de configuración: /etc/nginx/sites-available/odoo${NC}"
+        echo -e "${YELLOW}Revisar logs en: /var/log/nginx/odoo.error.log${NC}"
+        echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+        log_message "ERROR" "Nginx configuration test failed: $nginx_test_output"
+        
+        # Mostrar contenido del archivo para diagnóstico
+        echo -e "${CYAN}Contenido de /etc/nginx/sites-available/odoo:${NC}"
+        head -50 /etc/nginx/sites-available/odoo 2>/dev/null || echo "No se puede leer el archivo"
+        
+        # NO reiniciar nginx - salir con error
+        echo -e "${RED}INSTALACIÓN DETENIDA: Corrige la configuración de Nginx manualmente${NC}"
+        exit 1
     fi
     
     log_message "INFO" "Nginx configuration completed"
@@ -1426,10 +1443,9 @@ server {
 
 # HTTPS server
 server {
-    # NOTA: http2 on; es el formato correcto para Nginx >= 1.25.1
-    # Evita el warning: "http2 directive is deprecated"
-    listen 443 ssl;
-    http2 on;
+    # COMPATIBLE: listen 443 ssl http2; funciona en nginx 1.18+ (Ubuntu 22.04)
+    # NO usar 'http2 on;' - solo funciona en nginx >= 1.25.1
+    listen 443 ssl http2;
     server_name $DOMAIN_NAME;
 
     # Timeouts (importantes para operaciones largas en POS)
@@ -1481,7 +1497,7 @@ server {
 
         # Security headers
         add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-        proxy_cookie_flags session_id samesite=lax secure;
+        # NOTA: proxy_cookie_flags removido - incompatible con nginx < 1.19.3
     }
 
     # Longpolling (compatibilidad con versiones anteriores)
@@ -1515,7 +1531,7 @@ server {
         add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
         add_header X-Content-Type-Options nosniff always;
         add_header X-Frame-Options SAMEORIGIN always;
-        proxy_cookie_flags session_id samesite=lax secure;
+        # NOTA: proxy_cookie_flags removido - incompatible con nginx < 1.19.3
     }
 
     # Static files caching
@@ -1535,10 +1551,19 @@ server {
 }
 EOF
     
-    # Enable site
-    ln -sf /etc/nginx/sites-available/odoo /etc/nginx/sites-enabled/
+    # Enable site - eliminar default y crear symlink correcto
+    rm -f /etc/nginx/sites-enabled/default
+    rm -f /etc/nginx/sites-enabled/odoo  # Eliminar si existe para recrear limpio
+    ln -sf /etc/nginx/sites-available/odoo /etc/nginx/sites-enabled/odoo
     
-    log_message "INFO" "Nginx configuration created"
+    # Verificar que el symlink es correcto
+    if [ -L /etc/nginx/sites-enabled/odoo ]; then
+        log_message "INFO" "Nginx site symlink created correctly"
+    else
+        log_message "ERROR" "Failed to create Nginx site symlink"
+    fi
+    
+    log_message "INFO" "Nginx configuration created (compatible with nginx 1.18+)"
 }
 
 step_service_final_setup() {
